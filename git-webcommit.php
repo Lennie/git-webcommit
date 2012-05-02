@@ -15,8 +15,6 @@
 			2 => array("pipe", "r"),  // stderr
 		);
 
-		$cwd = '/some/dir';
-		$env = array('some_option' => 'aeiou');
 		$args = '';
 
 		foreach ($argarr as $v) {
@@ -25,7 +23,7 @@
 
 		$command = escapeshellcmd ($command);
 
-		$proc = proc_open($command . ' ' . $args, $descriptorspec, $pipes, $cwd, $env);
+		$proc = proc_open($command . ' ' . $args, $descriptorspec, $pipes);
 
 		if (is_resource($proc)) {
 			if ($blocking === false) {
@@ -37,9 +35,6 @@
 			global $_handles, $_handlecount;
 
 			$h = ++$_handlecount;
-
-//		echo "start_command:\n";
-//		var_dump ($h);
 
 			$_handles [$h] = Array ('proc' => $proc, 0 => $pipes [0], 1 => $pipes [1], 2 => $pipes [2]);
 
@@ -60,36 +55,13 @@
 		@fclose ($arr[1]);
 		@fclose ($arr[2]);
 
-//		echo "end_command:\n";
-//		var_dump ($h);
-//		var_dump ($_handles [$h]);
-
-		if ($_handles [$h]['running'] !== false) {
-
-//				$status = proc_get_status ($_handles[$h] ['proc']);
-//print_r ($status);
-//		if ($status ['running'] !== false) {
-			$rv2 = proc_close ($_handles [$h] ['proc']);
-//				$status = proc_get_status ($_handles[$h] ['proc']);
-//print_r ($status);
-//			if ($rv === false)
-				$rv = $rv2;
-		} else
-//			$rv = $_handles [$h]['proc']['exitcode'];
+		if ($_handles [$h]['running'] !== false)
+			$rv = proc_close ($_handles [$h] ['proc']);
+		else
 			$rv = $_handles [$h]['rv'];
-/*
-if ($rv !== 0) {
-	echo "<b>not 0 ?</b>\n";
-	var_dump ($rv);
-	var_dump ($rv2);
-	print_r ($_handles [$h]);
-}
-*/
-//var_dump ($rv);
 
 		$_handles [$h]['running'] = false;
 
-//		echo "was still running !!\n";
 		return $rv;
 	}
 
@@ -176,17 +148,10 @@ if ($rv !== 0) {
 
 				$status = proc_get_status ($_handles[$h] ['proc']);
 
-//		echo "_get_data:\n";
-//		var_dump ($h);
-
-//print_r ($status);
-
-				if ($status ['running'] === false) {
+				if ($status ['running'] === false)
 					$return_value = $status ['exitcode'];
-				} else {
+				else
 					$return_value = end_command ($h);
-				}
-//var_dump ($return_value);
 
 				$_handles [$h]['rv'] = $return_value;
 				$_handles [$h]['running'] = false;
@@ -207,10 +172,6 @@ if ($rv !== 0) {
 			$rv = stream_get_contents ($_handles[$h][1]); // if $rv == false we return false at the end
 
 		$status = proc_get_status ($_handles[$h]['proc']);
-
-//echo "get_all_data\n";
-
-print_r ($status);
 
 		if ($status ['running'] === false)
 			$return_value = $status ['exitcode'];
@@ -267,7 +228,8 @@ print_r ($status);
 			while (!is_done ($h)) {
 				$line = get_stdout_line ($h);
 				if ($line != '') {
-//					var_dump ($line);
+echo "<hr>";
+
 					$parsed = parse_line ($line);
 					interpret ($parsed);
 				}
@@ -276,9 +238,12 @@ print_r ($status);
 			$exit = get_exit_code ($h);
 			if ($exit !== 0)
 				return error ('command failed, it returned exitcode: '.$exit);
-
-			
 		}
+
+echo "<hr>";
+
+print_r ($GLOBALS ['_handles'][$h]['stdout']);
+clean_up ($h);
 
 		return $result;
 	}
@@ -312,19 +277,18 @@ print_r ($status);
 	}
 
 	function interpret ($parsed) {
-//echo "\nnewout: ";
-//var_dump ($newout);
-
 		if (isset ($parsed ['file'])) {
 			print_r ($parsed);
 			if ($parsed ['staged'] == '?') {
 				echo "new file !\n";
 				$h = start_command ('diff', Array ('-u', '/dev/null', $parsed ['file']));
-				echo get_all_data ($h);
+				echo htmlentities (get_all_data ($h));
+//var_dump (get_exit_code ($h));
 				clean_up ($h);
 			} elseif ($parsed ['modified'] == 'M') {
 				$h = start_command ('git', Array ('diff', $parsed ['file']));
-				echo get_all_data ($h);
+				echo htmlentities (get_all_data ($h));
+//var_dump (get_exit_code ($h));
 				clean_up ($h);
 			} elseif ($parsed ['modified'] == 'D?') {
 				print_r ($parsed);
@@ -340,6 +304,17 @@ print_r ($status);
 			echo "euh... not file nor dir: ".$parsed ['file']."\n";
 		}
 	}
+
+
+/*
+
+	hash1 = hash (status output)
+	hash2 = hash (file1)
+	hash3 = hash (file2)
+
+	hash (hash1,hash2,hash3) = result ?
+
+*/
 
 	var_dump (get_status ());
 ?>

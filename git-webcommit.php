@@ -829,10 +829,10 @@ _______________
 
 Short term TODO-list:
 
-- need a function to dynamically update the html_header_message output (starting with the refresh request, it should let the user know it is done refreshing)
-- get_status () and friends should be able to disable the HTML-elements by default
 - html_file should not interpret, anything like that should be moved into interpret and result stored in the array
 - html_file output needs a container (extra DIV around all the elements)
+- need a function to dynamically update the html_header_message output (starting with the refresh request, it should let the user know it is done refreshing)
+- get_status () and friends should be able to disable the HTML-elements by default
 - need a function to dynamically enable previously disabled HTML-elements
 - need a function to dynamically add HTML-elements
 - need a function to dynamically remove HTML-elements

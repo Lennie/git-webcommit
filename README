@@ -1,6 +1,6 @@
 git webcommit
 
-A tool to commit changed/new files from a directory straint from the browser.
+A tool to commit changed/new files from a directory straight from the browser.
 
 Depends on as little as possible installed on the webserver:
 - php 5.2+

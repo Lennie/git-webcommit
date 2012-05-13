@@ -8,6 +8,6 @@ Depends on as little as possible installed on the webserver:
 - diff
 - wc (for stats)
 
-All you need is a git repository on the server and upload a single PHP-file to your webserver.
+All you need is a git repository on the server and to upload a single PHP-file to your webserver.
 
 Authentication can be handle by the webserver or with a hash in the settings section of the PHP-file.

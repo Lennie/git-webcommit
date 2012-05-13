@@ -35,28 +35,33 @@
 	if ($_SERVER ['REQUEST_METHOD'] == 'POST') {
 		$commit_message = $_POST ['commit_message'];
 
-		if ($_POST ['change_staged'])
-			handle_change_staged ();
-		elseif ($_POST ['commit'])
-			handle_commit ();
+		debug ($_POST);
+
+		if ($_POST ['change_staged'] && $_POST ['statushash'])
+			handle_change_staged_req ();
+		elseif ($_POST ['commit'] && $_POST ['statushash'])
+			handle_commit_req ();
+		elseif ($_POST ['refresh'])
+			handle_refresh_req ();
 		else {
 			error ('POST failure');
 			exit ();
 		}
-	} else
+	} else {
+		html_header_message ('&nbsp;');
+		echo html_form_start ();
 		view_result ();
+	}
 
 	/// functions ///
 
 	function view_result ($status = '') {
 		global $somethingstaged, $enable_stats;
 
-		echo html_form_start ();
+		if ($status == '')
+			$status = get_status ();
 
-		if ($status == '') {
-			$status = get_status ($enable_stats);
-			debug ($status);
-		}
+		debug ($status);
 
 		if ($status ['disable_commit'] !== true)
 			$something_to_commit = $somethingstaged;
@@ -66,20 +71,49 @@
 		echo html_footer ();
 	}
 
-	function handle_change_staged () {
-		global $enable_stats;
-
-		$status = get_status ($enable_stats);
+	function handle_refresh_req () {
+		html_header_message ('refreshing...');
+		echo html_form_start ();
 
 		view_result ($status);
 	}
 
-	function handle_commit () {
+	function handle_change_staged_req () {
 		global $enable_stats;
 
-		$status = get_status ($enable_stats);
+		html_header_message ('checking, before handling staging...');
+		echo html_form_start ();
+
+		$status = get_status ();
+
+		if ($status ['hash'] != $_POST ['statushash'])
+			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
+		else {
+			error ('changing changed: not implemented yet ! Sorry');
+		}
 
 		view_result ($status);
+	}
+
+	function handle_commit_req () {
+		global $enable_stats;
+
+		html_header_message ('checking, before doing commit...');
+		echo html_form_start ();
+
+		$status = get_status ();
+
+		if ($status ['hash'] != $_POST ['statushash'])
+			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
+		else {
+			error ('committing a file: not implemented yet ! Sorry');
+		}
+
+		view_result ($status);
+	}
+
+	function html_header_message ($str = '') {
+		echo '<div id="headermessage">'.$str.'</div>'."\n";
 	}
 
 	function html_form_start () {
@@ -102,7 +136,8 @@ HERE;
 return <<<HERE
 		<input id="change_staged" type="submit" name="change_staged" value="change staged">
 		<input id="submit_commit" type="submit" name="commit" value="commit">
-		<input type="hidden" name="hash" value="$hash">
+		<input id="submit_refresh" type="submit" name="refresh" value="refresh">
+		<input type="hidden" name="statushash" value="$hash">
 		<textarea id="commit_message" name="commit_message">$commit_message</textarea>
 		</form>
 		<script>something_to_commit = $something_to_commit; enable_disable_buttons (); handle_commit_textarea ();</script>
@@ -218,7 +253,7 @@ function handle_commit_textarea () {
 	}
 }
 
-function handle_fileline (prefix, check) {
+function handle_fileline (prefix, check, disable) {
 	if (prefix == '')
 		return false;
 
@@ -241,32 +276,34 @@ function handle_fileline (prefix, check) {
 		});
 	}
 
-	var el = document.getElementById (prefix+'div');
-	if (el)
-		el.addEventListener ('click', function () {
-			var el2 = document.getElementById (prefix+'textarea');
-			console.log (el.id);
-			if (el2) {
-				if (el2.style.display == 'block')
-					el2.style.display = 'none'
-				else
-					el2.style.display = 'block';
-			}
-		});
+	if (!disable) {
+		var el = document.getElementById (prefix+'div');
+		if (el)
+			el.addEventListener ('click', function () {
+				var el2 = document.getElementById (prefix+'textarea');
+				if (el2) {
+					if (el2.style.display == 'block')
+						el2.style.display = 'none'
+					else
+						el2.style.display = 'block';
+				}
+			});
+	}
 }
 
 HERE;
 	}
 
-	function html_file_js ($prefix = '', $check = false) {
+	function html_file_js ($prefix = '', $check = false, $disable = false) {
 		$check = $check ? 'true' : 'false';
+		$disable = $disable ? 'true' : 'false';
 
 		return <<<HERE
-handle_fileline ('$prefix', $check);
+handle_fileline ('$prefix', $check, $disable);
 HERE;
 	}
 
-	function html_file ($filename, $state, $staged, $hash, $diff) {
+	function html_file ($filename, $state, $staged, $hash, $diff, $disabled = false) {
 		global $somethingstaged;
 
 		$basename = basename ($filename);
@@ -305,15 +342,22 @@ HERE;
 			$somethingstaged = true;
 		}
 
-		$js = html_file_js ($prefix, $checked);
+		$js = html_file_js ($prefix, $checked, $disable);
 		if ($checked)
 			$checked = 'checked ';
 
+		if ($diff === false)
+			$diff = '';
+
+		if ($disabled === true)
+			$disabled = 'disabled ';
+		else
+			$disabled = '';
 
 return <<<HERE
-<div id="${prefix}div" class="filename_div"><span class="checkbox_span" id="${prefix}checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}checkbox"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
-<input id="${prefix}filename" type="hidden" name="filename" value="$filename">
-<input id="${prefix}hash" type="hidden" name="hash" value="$hash">
+<div id="${prefix}div" class="filename_div"><span class="checkbox_span" id="${prefix}checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
+<input id="${prefix}filename" type="hidden" name="filename[]" value="$filename">
+<input id="${prefix}hash" type="hidden" name="hash[]" value="$hash">
 <textarea id="${prefix}textarea">$diff</textarea>
 <script>$js</script>
 HERE;
@@ -522,14 +566,14 @@ HERE;
 	}
 
 	function error ($str = '') {
-		echo 'ERROR: '.$str . "\n";
+		echo '<p>ERROR: '.$str . "</p>\n";
 		return false;
 	}
 
-	function debug ($input = '') {
+	function debug ($input = '', $force = false) {
 		global $debug;
 
-		if ($debug === false)
+		if ($force === false && $debug === false)
 			return true;
 
 		if (is_string ($input))
@@ -556,7 +600,7 @@ HERE;
 		$rs ['hash'] = sha1 ($str);
 	}
 
-	function get_status ($stats = false) {
+	function get_status ($disabled = false, $makediff = true, $stats = false) {
 		$result = Array ();
 
 		clearstatcache ();
@@ -574,7 +618,7 @@ HERE;
 //debug ('<hr>');
 
 					$parsed = parse_line ($line);
-					$int = interpret ($parsed, $stats);
+					$int = interpret ($parsed, $disabled, $makediff, $stats);
 					if ($int !== false) {
 						$result ['lines'][] = $int;
 					}
@@ -600,7 +644,7 @@ HERE;
 
 //debug ($GLOBALS ['_handles'][$h]['stdout']);
 
-clean_up ($h);
+		clean_up ($h);
 
 //debug ('<hr>');
 		return $result;
@@ -613,7 +657,7 @@ clean_up ($h);
 		return false;
 	}
 
-	function parse_line ($str, $stats = false) {
+	function parse_line ($str) {
 		global $sha1_empty_string;
 	
 		$str = rtrim ($str);
@@ -642,78 +686,100 @@ clean_up ($h);
 		return $res;
 	}
 
-	function interpret ($parsed) {
+	function interpret ($parsed, $disabled = false, $makediff = true, $stats = false) {
 		if (isset ($parsed ['file'])) {
 //			print_r ($parsed);
 			if ($parsed ['staged'] == '?' || $parsed ['staged'] == 'A') {
-//				debug ("new file !");
-				$command = 'diff';
-				$args = Array ('-u', '/dev/null', $parsed ['file']);
-				if ($parsed ['staged'] == 'A') {
-					$args = Array ('diff', '--cached', $parsed ['file']);
-					$command = 'git';
-				}
-				$h = start_command ($command, $args);
-				$diff = htmlentities (get_all_data ($h));
-//				debug ($diff);
-				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff);
+				if ($makediff) {
+//					debug ("new file !");
+					$command = 'diff';
+					$args = Array ('-u', '/dev/null', $parsed ['file']);
+					if ($parsed ['staged'] == 'A') {
+						$args = Array ('diff', '--cached', $parsed ['file']);
+						$command = 'git';
+					}
+					$h = start_command ($command, $args);
+					$diff = htmlentities (get_all_data ($h));
+//					debug ($diff);
+					clean_up ($h);
+				} else
+					$diff = false;
+
+				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
 //var_dump (get_exit_code ($h));
-				clean_up ($h);
 			} elseif (( $parsed ['modified'] == 'M') || ($parsed ['staged'] == 'M' && $parsed ['modified'] == ' ')) {
-				$args = Array ('diff', $parsed ['file']);
+				if ($makediff) {
+					$args = Array ('diff', $parsed ['file']);
 
-				if ($parsed ['staged'] == 'M' && $parsed ['modified'] == ' ')
-					$args = Array ('diff', '--cached', $parsed ['file']);
+					if ($parsed ['staged'] == 'M' && $parsed ['modified'] == ' ')
+						$args = Array ('diff', '--cached', $parsed ['file']);
 
-				$h = start_command ('git', $args);
-				$str = get_all_data ($h);
-//				debug ($str);
-				$diff = htmlentities ($str);
-				$exit = get_exit_code ($h);
-//				var_dump ($exit);
-//				debug ($diff);
-				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff);
+					$h = start_command ('git', $args);
+					$str = get_all_data ($h);
+//					debug ($str);
+					$diff = htmlentities ($str);
+					$exit = get_exit_code ($h);
+//					var_dump ($exit);
+//					debug ($diff);
 //var_dump (get_exit_code ($h));
-				clean_up ($h);
-			} elseif ($parsed ['modified'] == 'D') {
-//				debug ($parsed);
-				$args = Array ('diff', '--', $parsed ['file']);
-				$h = start_command ('git', $args);
-				$str = get_all_data ($h);
-//				debug ($str);
-				$diff = htmlentities ($str);
-				$exit = get_exit_code ($h);
-//				var_dump ($exit);
-//				debug ($diff);
-				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff);
-				clean_up ($h);
-			} elseif ($parsed ['staged'] == 'D') {
-//				debug ($parsed);
-				$args = Array ('diff', '--cached', '--', $parsed ['file']);
-				$h = start_command ('git', $args);
-				$str = get_all_data ($h);
-//				debug ($str);
-				$diff = htmlentities ($str);
-				$exit = get_exit_code ($h);
-//				var_dump ($exit);
-//				debug ($diff);
-				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff);
-				clean_up ($h);
-			} else {
-				debug ("euh... not new file, not modified, not deleted: ".$parsed ['file']);
-				debug ($parsed);
-			}
-		} elseif (isset ($parsed ['dir']))
-			debug ($parsed); // list of filenames ?
-		else {
-			debug ($parsed);
+					clean_up ($h);
+				} else
+					$diff = false;
 
-			debug ("euh... not file nor dir: ".$parsed ['file']);
+				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+			} elseif ($parsed ['modified'] == 'D') {
+				if ($makediff) {
+//					debug ($parsed);
+					$args = Array ('diff', '--', $parsed ['file']);
+					$h = start_command ('git', $args);
+					$str = get_all_data ($h);
+//					debug ($str);
+					$diff = htmlentities ($str);
+					$exit = get_exit_code ($h);
+//					var_dump ($exit);
+//					debug ($diff);
+					clean_up ($h);
+				} else
+					$diff = false;
+
+				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+			} elseif ($parsed ['staged'] == 'D') {
+				if ($makediff) {
+//					debug ($parsed);
+					$args = Array ('diff', '--cached', '--', $parsed ['file']);
+					$h = start_command ('git', $args);
+					$str = get_all_data ($h);
+//					debug ($str);
+					$diff = htmlentities ($str);
+					$exit = get_exit_code ($h);
+//					var_dump ($exit);
+//					debug ($diff);
+					clean_up ($h);
+				} else
+					$diff = false;
+
+				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+			} else {
+				error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
+
+				debug ($parsed, true);
+
+				exit ();
+			}
+		} else {
+			error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
+
+			debug ($parsed, true);
+
+			exit ();
 		}
 		return $parsed;
 	}
 
 /*
+
+notes:
+_______________
 
 status-hash is made like so:
 
@@ -722,9 +788,7 @@ status-hash is made like so:
 	hash3 = hash (file2)
 
 	hash (hash1,hash2,hash3) = result ?
-
-____
-
+_______________
 
 per file stats:
 
@@ -741,7 +805,6 @@ $ git diff --numstat test.txt
 
 $ wc -l asdfasdf.txt 
 1 asdfasdf.txt
-
 _______________
 
 basic workflow:
@@ -762,6 +825,18 @@ git commit --dry-run --porcelain
 git commit --file=/tmp/commit.message
 # or commit message from stdin:
 git commit --file=-
+_______________
+
+Short term TODO-list:
+
+- need a function to dynamically update the html_header_message output (starting with the refresh request, it should let the user know it is done refreshing)
+- get_status () and friends should be able to disable the HTML-elements by default
+- html_file should not interpret, anything like that should be moved into interpret and result stored in the array
+- html_file output needs a container (extra DIV around all the elements)
+- need a function to dynamically enable previously disabled HTML-elements
+- need a function to dynamically add HTML-elements
+- need a function to dynamically remove HTML-elements
+- need a function to dynamically add the diff-output
 
 */
 

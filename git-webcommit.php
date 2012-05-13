@@ -226,6 +226,8 @@ function handle_fileline (prefix, check) {
 	if (el) {
 		el.checked = check;
 		el.addEventListener ('click', function (e) {
+			var el = document.getElementById (prefix+'checkbox');
+
 			if (el) {
 				if (check === el.checked)
 					staged_checked_changed--;
@@ -306,6 +308,7 @@ HERE;
 		$js = html_file_js ($prefix, $checked);
 		if ($checked)
 			$checked = 'checked ';
+
 
 return <<<HERE
 <div id="${prefix}div" class="filename_div"><span class="checkbox_span" id="${prefix}checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}checkbox"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
@@ -712,15 +715,16 @@ clean_up ($h);
 
 /*
 
+status-hash is made like so:
+
 	hash1 = hash (status output)
 	hash2 = hash (file1)
 	hash3 = hash (file2)
 
 	hash (hash1,hash2,hash3) = result ?
 
-*/
+____
 
-/*
 
 per file stats:
 
@@ -737,6 +741,27 @@ $ git diff --numstat test.txt
 
 $ wc -l asdfasdf.txt 
 1 asdfasdf.txt
+
+_______________
+
+basic workflow:
+
+# get list of files changed (porcelain output is machine parsable with status information per file):
+git status --porcelain
+
+# get diff of file
+git diff $FILE
+
+# add file to index/cache to commit
+git add $FILE
+
+# do dry-run before commit
+git commit --dry-run --porcelain
+
+# commit file(s) 
+git commit --file=/tmp/commit.message
+# or commit message from stdin:
+git commit --file=-
 
 */
 

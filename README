@@ -1,0 +1,13 @@
+git webcommit
+
+A tool to commit changed/new files from a directory straint from the browser.
+
+Depends on as little as possible installed on the webserver:
+- php 5.2+
+- git v1.7.x (why the version ? it needs: git status --porcelain)
+- diff
+- wc (for stats)
+
+All you need is a git repository on the server and upload a single PHP-file to your webserver.
+
+Authentication can be handle by the webserver or with a hash in the settings section of the PHP-file.

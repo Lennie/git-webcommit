@@ -318,26 +318,7 @@ HERE;
 
 		$checked = false;
 
-		if ($state == '?' || $staged == 'A')
-			$state = 'New';
-
-		if ($state == 'D' || $staged == 'D')
-			$state = 'Deleted';
-
-		if ($state == 'M' || $staged == 'M')
-			$state = 'Modified';
-
-		if ($staged == ' ' || $staged == '?')
-			$staged = 'N';
-
-		if ($staged == ' ')
-			$staged = 'N';
-
-		if ($staged == '?')
-			$staged = 'N';
-
-		if ($staged == 'Y' || $staged == 'M' || $staged == 'A' || $staged == 'D') {
-			$staged = 'Y';
+		if ($staged == 'Y') {
 			$checked = true;
 			$somethingstaged = true;
 		}
@@ -705,7 +686,10 @@ HERE;
 				} else
 					$diff = false;
 
-				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				$parsed ['htmlstate'] = set_state ($parsed ['modified'], $parsed ['staged']);
+				$parsed ['htmlstaged'] = set_staged ($parsed ['modified'], $parsed ['staged']);
+
+				echo html_file ($parsed ['file'], $parsed ['htmlstate'], $parsed ['htmlstaged'], $parsed ['hash'], $diff, $disabled);
 //var_dump (get_exit_code ($h));
 			} elseif (( $parsed ['modified'] == 'M') || ($parsed ['staged'] == 'M' && $parsed ['modified'] == ' ')) {
 				if ($makediff) {
@@ -726,7 +710,10 @@ HERE;
 				} else
 					$diff = false;
 
-				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				$parsed ['htmlstate'] = set_state ($parsed ['modified'], $parsed ['staged']);
+				$parsed ['htmlstaged'] = set_staged ($parsed ['modified'], $parsed ['staged']);
+
+				echo html_file ($parsed ['file'], $parsed ['htmlstate'], $parsed ['htmlstaged'], $parsed ['hash'], $diff, $disabled);
 			} elseif ($parsed ['modified'] == 'D') {
 				if ($makediff) {
 //					debug ($parsed);
@@ -742,7 +729,10 @@ HERE;
 				} else
 					$diff = false;
 
-				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				$parsed ['htmlstate'] = set_state ($parsed ['modified'], $parsed ['staged']);
+				$parsed ['htmlstaged'] = set_staged ($parsed ['modified'], $parsed ['staged']);
+
+				echo html_file ($parsed ['file'], $parsed ['htmlstate'], $parsed ['htmlstaged'], $parsed ['hash'], $diff, $disabled);
 			} elseif ($parsed ['staged'] == 'D') {
 				if ($makediff) {
 //					debug ($parsed);
@@ -758,7 +748,10 @@ HERE;
 				} else
 					$diff = false;
 
-				echo html_file ($parsed ['file'], $parsed ['modified'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				$parsed ['htmlstate'] = set_state ($parsed ['modified'], $parsed ['staged']);
+				$parsed ['htmlstaged'] = set_staged ($parsed ['modified'], $parsed ['staged']);
+
+				echo html_file ($parsed ['file'], $parsed ['htmlstate'], $parsed ['htmlstaged'], $parsed ['hash'], $diff, $disabled);
 			} else {
 				error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
 
@@ -774,6 +767,39 @@ HERE;
 			exit ();
 		}
 		return $parsed;
+	}
+
+	function set_state ($modified, $staged) {
+		$rv = $modified; // last resort ?
+	
+		if ($modified == '?' || $staged == 'A')
+			$rv = 'New';
+
+		if ($modified == 'D' || $staged == 'D')
+			$rv = 'Deleted';
+
+		if ($modified == 'M' || $staged == 'M')
+			$rv = 'Modified';
+
+		return $rv;
+	}
+
+	function set_staged ($modified, $staged) {
+		$rv = $staged; // last resort ?
+
+		if ($staged == ' ' || $staged == '?')
+			$rv = 'N';
+
+		if ($staged == ' ')
+			$rv = 'N';
+
+		if ($staged == '?')
+			$rv = 'N';
+
+		if ($staged == 'Y' || $staged == 'M' || $staged == 'A' || $staged == 'D')
+			$rv = 'Y';
+
+		return $rv;
 	}
 
 /*
@@ -829,7 +855,7 @@ _______________
 
 Short term TODO-list:
 
-- html_file should not interpret, anything like that should be moved into interpret and result stored in the array
+- html_file should use the hash for the prefixes ?
 - html_file output needs a container (extra DIV around all the elements)
 - need a function to dynamically update the html_header_message output (starting with the refresh request, it should let the user know it is done refreshing)
 - get_status () and friends should be able to disable the HTML-elements by default

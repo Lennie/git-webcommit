@@ -1,5 +1,7 @@
 <?php
 
+//	error_reporting (E_ALL);
+
 	/// settings ///
 
 	$debug = false;
@@ -15,7 +17,7 @@
 
 	/// main ///
 
-	ob_end_clean ();
+	@ob_end_clean ();
 	flush ();
 
 	$dir = $repos [$defaultrepo];
@@ -37,11 +39,11 @@
 
 		debug ($_POST);
 
-		if ($_POST ['change_staged'] && $_POST ['statushash'])
+		if (isset ($_POST ['change_staged']) && $_POST ['change_staged'] && isset ($_POST ['statushash']) && $_POST ['statushash'])
 			handle_change_staged_req ();
-		elseif ($_POST ['commit'] && $_POST ['statushash'])
+		elseif (isset ($_POST ['commit']) && $_POST ['commit'] && isset ($_POST ['statushash']) && $_POST ['statushash'])
 			handle_commit_req ();
-		elseif ($_POST ['refresh'])
+		elseif (isset ($_POST ['refresh']) && $_POST ['refresh'])
 			handle_refresh_req ();
 		else {
 			error ('POST failure');
@@ -75,7 +77,7 @@
 		html_header_message ('refreshing...');
 		echo html_form_start ();
 
-		view_result ($status);
+		view_result ();
 	}
 
 	function handle_change_staged_req () {
@@ -323,7 +325,7 @@ HERE;
 			$somethingstaged = true;
 		}
 
-		$js = html_file_js ($prefix, $checked, $disable);
+		$js = html_file_js ($prefix, $checked, $disabled);
 		if ($checked)
 			$checked = 'checked ';
 
@@ -391,7 +393,7 @@ HERE;
 		@fclose ($arr[1]);
 		@fclose ($arr[2]);
 
-		if ($_handles [$h]['running'] !== false)
+		if ((!isset ($_handles [$h]['running'])) || ($_handles [$h]['running'] !== false))
 			$rv = proc_close ($_handles [$h] ['proc']);
 		else
 			$rv = $_handles [$h]['rv'];
@@ -407,7 +409,7 @@ HERE;
 		if (!isset ($_handles [$h]))
 			return true; // closest thing to an error
 
-		if ($_handles [$h]['done'] === true)
+		if (isset ($_handles [$h]['done']) && $_handles [$h]['done'] === true)
 			return true;
 
 		return false;
@@ -462,6 +464,12 @@ HERE;
 			$newout = fgets ($_handles[$h][1], 8192);
 			$newerr = fgets ($_handles[$h][2], 8192);
 
+			if (!isset ($_handles[$h]['stdout']))
+				$_handles[$h]['stdout'] = '';
+
+			if (!isset ($_handles[$h]['stderr']))
+				$_handles[$h]['stderr'] = '';
+
 			if ($newout !== false)
 				$_handles[$h]['stdout'] .= $newout;
 			if ($newerr !== false)
@@ -503,7 +511,7 @@ HERE;
 		if (!isset ($_handles [$h]))
 			return false;
 
-		if ($_handles [$h]['done'])
+		if (isset ($_handles [$h]['done']) && $_handles [$h]['done'])
 			return $_handles [$h]['stdout'];
 
 		if ($type == 'stdout')
@@ -540,7 +548,7 @@ HERE;
 		if (!isset ($_handles [$h]))
 			return false;
 
-		if ($_handles [$h]['done'] !== true)
+		if (isset ($_handles [$h]['done']) && $_handles [$h]['done'] !== true)
 			end_command ($h);
 
 		unset ($_handles [$h]);
@@ -614,7 +622,7 @@ HERE;
 
 			$result ['output'] = get_all_data ($h);
 
-			$result ['outputhash'] = sha1 ($result['str']);
+			$result ['outputhash'] = sha1 ($result['output']);
 
 			$result ['disable_commit'] = false;
 
@@ -855,7 +863,7 @@ _______________
 
 Short term TODO-list:
 
-- html_file should use the hash for the prefixes ?
+- html_file should use the hash for the prefixes ? -> no, see UI-technical technical implementation ideas below
 - html_file output needs a container (extra DIV around all the elements)
 - need a function to dynamically update the html_header_message output (starting with the refresh request, it should let the user know it is done refreshing)
 - get_status () and friends should be able to disable the HTML-elements by default
@@ -863,6 +871,11 @@ Short term TODO-list:
 - need a function to dynamically add HTML-elements
 - need a function to dynamically remove HTML-elements
 - need a function to dynamically add the diff-output
+
+UI technical implementation ideas:
+- send timestamp-based prefixes in the POST to the server
+- the server can than just send whole containers to the client
+- and use appendChild/insertBefore/removeChild to insert it in the DOM in the right place, removing the old container, if any.
 
 */
 

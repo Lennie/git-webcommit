@@ -50,7 +50,7 @@
 			exit ();
 		}
 	} else {
-		html_header_message ('&nbsp;');
+		echo html_header_message ('&nbsp;');
 		echo html_form_start ();
 		view_result ();
 	}
@@ -74,7 +74,7 @@
 	}
 
 	function handle_refresh_req () {
-		html_header_message ('refreshing...');
+		echo html_header_message ('refreshing...');
 		echo html_form_start ();
 
 		view_result ();
@@ -83,7 +83,7 @@
 	function handle_change_staged_req () {
 		global $enable_stats;
 
-		html_header_message ('checking, before handling staging...');
+		echo html_header_message ('checking, before handling staging...');
 		echo html_form_start ();
 
 		$status = get_status ();
@@ -100,7 +100,7 @@
 	function handle_commit_req () {
 		global $enable_stats;
 
-		html_header_message ('checking, before doing commit...');
+		echo html_header_message ('checking, before doing commit...');
 		echo html_form_start ();
 
 		$status = get_status ();
@@ -108,14 +108,14 @@
 		if ($status ['hash'] != $_POST ['statushash'])
 			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
 		else {
-			error ('committing a file: not implemented yet ! Sorry');
+			error ('committing staged files: not implemented yet ! Sorry');
 		}
 
 		view_result ($status);
 	}
 
 	function html_header_message ($str = '') {
-		echo '<div id="headermessage">'.$str.'</div>'."\n";
+		return ('<div id="headermessage">'.$str.'</div>'."\n");
 	}
 
 	function html_form_start () {
@@ -259,11 +259,11 @@ function handle_fileline (prefix, check, disable) {
 	if (prefix == '')
 		return false;
 
-	var el = document.getElementById (prefix+'checkbox');
+	var el = document.getElementById (prefix+'_checkbox');
 	if (el) {
 		el.checked = check;
 		el.addEventListener ('click', function (e) {
-			var el = document.getElementById (prefix+'checkbox');
+			var el = document.getElementById (prefix+'_checkbox');
 
 			if (el) {
 				if (check === el.checked)
@@ -279,10 +279,10 @@ function handle_fileline (prefix, check, disable) {
 	}
 
 	if (!disable) {
-		var el = document.getElementById (prefix+'div');
+		var el = document.getElementById (prefix+'_div');
 		if (el)
 			el.addEventListener ('click', function () {
-				var el2 = document.getElementById (prefix+'textarea');
+				var el2 = document.getElementById (prefix+'_textarea');
 				if (el2) {
 					if (el2.style.display == 'block')
 						el2.style.display = 'none'
@@ -312,11 +312,11 @@ HERE;
 		static $ts;
 
 		if (!isset ($ts))
-			$ts = mktime ();
+			$ts = microtime (true);
 		else
 			$ts++;
 
-		$prefix = $basename . '_' . $ts . '_';
+		$prefix = $basename . '_' . $ts;
 
 		$checked = false;
 
@@ -338,10 +338,11 @@ HERE;
 			$disabled = '';
 
 return <<<HERE
-<div id="${prefix}div" class="filename_div"><span class="checkbox_span" id="${prefix}checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
-<input id="${prefix}filename" type="hidden" name="filename[]" value="$filename">
-<input id="${prefix}hash" type="hidden" name="hash[]" value="$hash">
-<textarea id="${prefix}textarea">$diff</textarea>
+<div id="${prefix}_div" class="filename_div"><span class="checkbox_span" id="${prefix}_checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}_checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
+<input id="${prefix}_filename" type="hidden" name="filename[]" value="$filename">
+<input id="${prefix}_hash" type="hidden" name="hash[]" value="$hash">
+<input id="${prefix}_prefix" type="hidden" name="prefix[]" value="$prefix">
+<textarea id="${prefix}_textarea">$diff</textarea>
 <script>$js</script>
 HERE;
 	}
@@ -653,7 +654,7 @@ HERE;
 		$file = substr ($str, 3);
 
 		if (file_exists ($file) ) {
-			$res = Array ('staged' => $str [0], 'modified' => $str [1], 'str' => $str);
+			$res = Array ('strstaged' => $str [0], 'strmodified' => $str [1], 'str' => $str);
 			$type = filetype ($file);
 			if ($type === 'file') {
 				$res ['hash'] = get_file_hash ($file);
@@ -665,9 +666,9 @@ HERE;
 
 			return $res;
 		} elseif ($str [0] == ' ' && $str [1] == 'D') {
-			$res = Array ('staged' => ' ', 'modified' => 'D', 'str' => $str, 'file' => $file, 'hash' => $sha1_empty_string);
+			$res = Array ('strstaged' => ' ', 'strmodified' => 'D', 'str' => $str, 'file' => $file, 'hash' => $sha1_empty_string);
 		} elseif ($str [0] == 'D' && $str [1] == ' ') {
-			$res = Array ('staged' => 'D', 'modified' => ' ', 'str' => $str, 'file' => $file, 'hash' => $sha1_empty_string);
+			$res = Array ('strstaged' => 'D', 'strmodified' => ' ', 'str' => $str, 'file' => $file, 'hash' => $sha1_empty_string);
 		} else {
 			$res = Array ('str' => $str);
 		}
@@ -678,7 +679,7 @@ HERE;
 	function interpret ($parsed, $disabled = false, $makediff = true, $stats = false) {
 		if (isset ($parsed ['file'])) {
 //			print_r ($parsed);
-			if ($parsed ['staged'] == '?' || $parsed ['staged'] == 'A') {
+			if ($parsed ['strstaged'] == '?' || $parsed ['strstaged'] == 'A') {
 				if ($makediff) {
 //					debug ("new file !");
 					$command = 'diff';
@@ -694,16 +695,16 @@ HERE;
 				} else
 					$diff = false;
 
-				$parsed ['htmlstate'] = set_state ($parsed ['modified'], $parsed ['staged']);
-				$parsed ['htmlstaged'] = set_staged ($parsed ['modified'], $parsed ['staged']);
+				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
+				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
 
-				echo html_file ($parsed ['file'], $parsed ['htmlstate'], $parsed ['htmlstaged'], $parsed ['hash'], $diff, $disabled);
+				echo html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
 //var_dump (get_exit_code ($h));
-			} elseif (( $parsed ['modified'] == 'M') || ($parsed ['staged'] == 'M' && $parsed ['modified'] == ' ')) {
+			} elseif (( $parsed ['strmodified'] == 'M') || ($parsed ['strstaged'] == 'M' && $parsed ['strmodified'] == ' ')) {
 				if ($makediff) {
 					$args = Array ('diff', $parsed ['file']);
 
-					if ($parsed ['staged'] == 'M' && $parsed ['modified'] == ' ')
+					if ($parsed ['strstaged'] == 'M' && $parsed ['strmodified'] == ' ')
 						$args = Array ('diff', '--cached', $parsed ['file']);
 
 					$h = start_command ('git', $args);
@@ -718,11 +719,11 @@ HERE;
 				} else
 					$diff = false;
 
-				$parsed ['htmlstate'] = set_state ($parsed ['modified'], $parsed ['staged']);
-				$parsed ['htmlstaged'] = set_staged ($parsed ['modified'], $parsed ['staged']);
+				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
+				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
 
-				echo html_file ($parsed ['file'], $parsed ['htmlstate'], $parsed ['htmlstaged'], $parsed ['hash'], $diff, $disabled);
-			} elseif ($parsed ['modified'] == 'D') {
+				echo html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+			} elseif ($parsed ['strmodified'] == 'D') {
 				if ($makediff) {
 //					debug ($parsed);
 					$args = Array ('diff', '--', $parsed ['file']);
@@ -737,11 +738,11 @@ HERE;
 				} else
 					$diff = false;
 
-				$parsed ['htmlstate'] = set_state ($parsed ['modified'], $parsed ['staged']);
-				$parsed ['htmlstaged'] = set_staged ($parsed ['modified'], $parsed ['staged']);
+				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
+				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
 
-				echo html_file ($parsed ['file'], $parsed ['htmlstate'], $parsed ['htmlstaged'], $parsed ['hash'], $diff, $disabled);
-			} elseif ($parsed ['staged'] == 'D') {
+				echo html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+			} elseif ($parsed ['strstaged'] == 'D') {
 				if ($makediff) {
 //					debug ($parsed);
 					$args = Array ('diff', '--cached', '--', $parsed ['file']);
@@ -756,10 +757,10 @@ HERE;
 				} else
 					$diff = false;
 
-				$parsed ['htmlstate'] = set_state ($parsed ['modified'], $parsed ['staged']);
-				$parsed ['htmlstaged'] = set_staged ($parsed ['modified'], $parsed ['staged']);
+				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
+				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
 
-				echo html_file ($parsed ['file'], $parsed ['htmlstate'], $parsed ['htmlstaged'], $parsed ['hash'], $diff, $disabled);
+				echo html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
 			} else {
 				error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
 
@@ -878,5 +879,3 @@ UI technical implementation ideas:
 - and use appendChild/insertBefore/removeChild to insert it in the DOM in the right place, removing the old container, if any.
 
 */
-
-?>

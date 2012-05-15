@@ -5,10 +5,13 @@
 	/// settings ///
 
 	$debug = false;
-//	$debug = true;
 
 	$enable_unstable_code = false;
-//	$enable_unstable_code = true;
+	$enable_unstable_code = true;
+
+	if ($enable_unstable_code) {
+//		$debug = true;
+	}
 
 	$enable_stats = false; // not available yet
 
@@ -38,7 +41,10 @@
 	echo html_header ();
 
 	if ($_SERVER ['REQUEST_METHOD'] == 'POST') {
-		$commit_message = $_POST ['commit_message'];
+		if (isset ($_POST ['commit_message']))
+			$commit_message = $_POST ['commit_message'];
+		else
+			$commit_message = '';
 
 		debug ($_POST);
 
@@ -89,13 +95,16 @@
 		echo html_header_message ('checking, before handling staging...');
 		echo html_form_start ();
 
-		$status = get_status ();
+		if ($enable_unstable_code)
+			$status = get_status (true, false, false);
+		else
+			$status = get_status ();
 
 		if ($status ['hash'] != $_POST ['statushash'])
 			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
 		else {
 			if ($enable_unstable_code) {
-				echo "<p>doing staging/unstaging...</p>\n";
+				debug ("doing staging/unstaging...");
 
 				$num1 = 0;
 				$num2 = 0;
@@ -107,37 +116,31 @@
 
 				$poststaged = Array ();
 
-				foreach ($_POST ['stagecheckbox'] as $v) {
-					$key = array_search ($v, $_POST ['hash']);
-					if ($key !== false)
-						$poststaged [$key] = 'Y';
-				}
+				if (isset ($_POST ['stagecheckbox']))
+					foreach ($_POST ['stagecheckbox'] as $v) {
+						$key = array_search ($v, $_POST ['hash']);
+						if ($key !== false)
+							$poststaged [$key] = 'Y';
+					}
 
 				$max = count ($_POST ['filename']);
 				if ($max !== count ($arr))
 					staged_change_checker_error ();
-
-				$needstobestaged = Array ();
-				$needstobeunstaged = Array ();
 
 				for ($i = 0; $i < $max; $i++) {
 					if ($_POST ['filename'] [$i] !== $arr [$i]) 
 						staged_change_checker_error ();
 
 					if ($status ['lines'][$i]['staged'] == 'N' && isset ($poststaged [$i]) && $poststaged [$i] == 'Y')
-						$needstobestaged [] = $arr [$i];
+						stage_file ($arr [$i]);
 
 					if ($status ['lines'][$i]['staged'] == 'Y' && !isset ($poststaged [$i]))
-						$needstobeunstaged [] = $arr [$i];
+						unstage_file ($arr [$i]);
+
+					echo html_js_remove_container ($status ['lines'][$i]['prefix']);
 				}
 
-				foreach ($needstobestaged as $v)
-					stage_file ($v);
-
-				foreach ($needstobeunstaged as $v)
-					unstage_file ($v);
-
-				$status = get_status ();
+				$status = get_status (false, true, $enable_stats);
 			} else
 				error ('changing changed: not implemented yet ! Sorry');
 		}
@@ -146,27 +149,27 @@
 	}
 
 	function stage_file ($file) {
-		echo "<p>staging file... $file</p>\n";
+		debug ("staging file $file");
 		$args = Array ('add', $file);
-		debug ($args);
+		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
 		$str = get_all_data ($h, 'stderr');
 		debug ($str);
 		$exit = get_exit_code ($h);
-		var_dump ($exit);
+		debug ($exit);
 //		debug ($diff);
 		clean_up ($h);
 	}
 
 	function unstage_file ($file) {
-		echo "<p>unstaging file...</p>\n";
+		debug ("unstaging file: $file");
 		$args = Array ('reset', 'HEAD', $file);
-		debug ($args);
+		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
 		$str = get_all_data ($h, 'stderr');
 		debug ($str);
 		$exit = get_exit_code ($h);
-		var_dump ($exit);
+		debug ($exit);
 //		debug ($diff);
 		clean_up ($h);
 	}
@@ -177,18 +180,27 @@
 	}
 
 	function handle_commit_req () {
-		global $enable_stats, $enable_unstable_code;
+		global $enable_stats, $enable_unstable_code, $somethingstaged;
 
 		echo html_header_message ('checking, before doing commit...');
 		echo html_form_start ();
 
-		$status = get_status ();
+		if ($enable_unstable_code)
+			$status = get_status (true, false, false);
+		else
+			$status = get_status ();
 
 		if ($status ['hash'] != $_POST ['statushash'])
 			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
 		else {
 			if ($enable_unstable_code) {
 				do_commit ($_POST ['commit_message']);
+
+				$max = count ($_POST ['filename']);
+				for ($i = 0; $i < $max; $i++)
+					echo html_js_remove_container ($status ['lines'][$i]['prefix']);
+
+				$somethingstaged = false;
 
 				$status = get_status ();
 			} else
@@ -204,18 +216,28 @@
 		fwrite ($fp, $msg);
 		fclose ($fp);
 
-		echo "<p>commiting changed files...</p>\n";
+		debug ("commiting changed files...");
 		$args = Array ('commit', '-F', $tmp);
-		debug ($args);
+		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
 		$str = get_all_data ($h, 'stderr');
 		debug ($str);
 		$exit = get_exit_code ($h);
-		var_dump ($exit);
+		debug ($exit);
 //		debug ($diff);
 		clean_up ($h);
 
 		unlink ($tmp);
+	}
+
+	function html_js_remove_container ($prefix) {
+return <<<HERE
+		<script>( function () {
+			var el = document.getElementById ('${prefix}_container');
+			if (el)
+				el.parentNode.removeChild (el);
+		}) ();</script>
+HERE;
 	}
 
 	function html_header_message ($str = '') {
@@ -412,7 +434,6 @@ HERE;
 	function html_file ($filename, $state, $staged, $hash, $diff, $disabled = false) {
 		global $somethingstaged;
 
-		$basename = basename ($filename);
 		static $ts;
 
 		if (!isset ($ts))
@@ -420,6 +441,7 @@ HERE;
 		else
 			$ts++;
 
+		$basename = basename ($filename);
 		$prefix = $basename . '_' . $ts;
 
 		$checked = false;
@@ -441,7 +463,7 @@ HERE;
 		else
 			$disabled = '';
 
-return <<<HERE
+$str = <<<HERE
 <div id="${prefix}_container"><div id="${prefix}_div" class="filename_div"><span class="checkbox_span" id="${prefix}_checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}_checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
 <input id="${prefix}_filename" type="hidden" name="filename[]" value="$filename">
 <input id="${prefix}_hash" type="hidden" name="hash[]" value="$hash">
@@ -449,6 +471,8 @@ return <<<HERE
 <textarea id="${prefix}_textarea">$diff</textarea>
 <script>$js</script></div>
 HERE;
+
+		return Array ($str, $prefix);
 	}
 
 	function start_command ($command, $argarr, $blocking = true) {
@@ -831,7 +855,9 @@ HERE;
 				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
 				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
 
-				echo html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				echo $str;
+				$parsed ['prefix'] = $prefix;
 //var_dump (get_exit_code ($h));
 			} elseif (( $parsed ['strmodified'] == 'M') || ($parsed ['strstaged'] == 'M' && $parsed ['strmodified'] == ' ')) {
 				if ($makediff) {
@@ -856,7 +882,9 @@ HERE;
 				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
 				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
 
-				echo html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				echo $str;
+				$parsed ['prefix'] = $prefix;
 			} elseif ($parsed ['strmodified'] == 'D') {
 				if ($makediff) {
 //					debug ($parsed);
@@ -876,7 +904,9 @@ HERE;
 				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
 				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
 
-				echo html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				echo $str;
+				$parsed ['prefix'] = $prefix;
 			} elseif ($parsed ['strstaged'] == 'D') {
 				if ($makediff) {
 //					debug ($parsed);
@@ -896,7 +926,9 @@ HERE;
 				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
 				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
 
-				echo html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				echo $str;
+				$parsed ['prefix'] = $prefix;
 			} else {
 				error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
 

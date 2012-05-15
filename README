@@ -4,7 +4,7 @@ A tool to commit changed/new files from a directory on the webserver straight fr
 
 It is meant to NOT make changes to the files in directory, only append new history to the repository.
 
-[screenshot: ][https://github.com/Lennie/git-webcommit/blob/master/screenshot.png]
+[screenshot: ][blob/master/screenshot.png]
 
 Depends on as little as possible installed on the webserver:
 - php 5.2+

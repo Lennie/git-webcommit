@@ -1,11 +1,14 @@
 <?php
 
-//	error_reporting (E_ALL);
+	error_reporting (E_ALL);
 
 	/// settings ///
 
 	$debug = false;
 //	$debug = true;
+
+	$enable_unstable_code = false;
+//	$enable_unstable_code = true;
 
 	$enable_stats = false; // not available yet
 
@@ -41,7 +44,7 @@
 
 		if (isset ($_POST ['change_staged']) && $_POST ['change_staged'] && isset ($_POST ['statushash']) && $_POST ['statushash'])
 			handle_change_staged_req ();
-		elseif (isset ($_POST ['commit']) && $_POST ['commit'] && isset ($_POST ['statushash']) && $_POST ['statushash'])
+		elseif (isset ($_POST ['commit']) && $_POST ['commit'] && isset ($_POST ['statushash']) && $_POST ['statushash'] && isset ($_POST ['commit_message']) && $_POST ['commit_message'] != '')
 			handle_commit_req ();
 		elseif (isset ($_POST ['refresh']) && $_POST ['refresh'])
 			handle_refresh_req ();
@@ -81,7 +84,7 @@
 	}
 
 	function handle_change_staged_req () {
-		global $enable_stats;
+		global $enable_stats, $enable_unstable_code;
 
 		echo html_header_message ('checking, before handling staging...');
 		echo html_form_start ();
@@ -91,14 +94,90 @@
 		if ($status ['hash'] != $_POST ['statushash'])
 			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
 		else {
-			error ('changing changed: not implemented yet ! Sorry');
+			if ($enable_unstable_code) {
+				echo "<p>doing staging/unstaging...</p>\n";
+
+				$num1 = 0;
+				$num2 = 0;
+
+				$arr = Array ();
+
+				foreach ($status ['lines'] as $v)
+					$arr [] = $v ['file'];
+
+				$poststaged = Array ();
+
+				foreach ($_POST ['stagecheckbox'] as $v) {
+					$key = array_search ($v, $_POST ['hash']);
+					if ($key !== false)
+						$poststaged [$key] = 'Y';
+				}
+
+				$max = count ($_POST ['filename']);
+				if ($max !== count ($arr))
+					staged_change_checker_error ();
+
+				$needstobestaged = Array ();
+				$needstobeunstaged = Array ();
+
+				for ($i = 0; $i < $max; $i++) {
+					if ($_POST ['filename'] [$i] !== $arr [$i]) 
+						staged_change_checker_error ();
+
+					if ($status ['lines'][$i]['staged'] == 'N' && isset ($poststaged [$i]) && $poststaged [$i] == 'Y')
+						$needstobestaged [] = $arr [$i];
+
+					if ($status ['lines'][$i]['staged'] == 'Y' && !isset ($poststaged [$i]))
+						$needstobeunstaged [] = $arr [$i];
+				}
+
+				foreach ($needstobestaged as $v)
+					stage_file ($v);
+
+				foreach ($needstobeunstaged as $v)
+					unstage_file ($v);
+
+				$status = get_status ();
+			} else
+				error ('changing changed: not implemented yet ! Sorry');
 		}
 
 		view_result ($status);
 	}
 
+	function stage_file ($file) {
+		echo "<p>staging file... $file</p>\n";
+		$args = Array ('add', $file);
+		debug ($args);
+		$h = start_command ('git', $args);
+		$str = get_all_data ($h, 'stderr');
+		debug ($str);
+		$exit = get_exit_code ($h);
+		var_dump ($exit);
+//		debug ($diff);
+		clean_up ($h);
+	}
+
+	function unstage_file ($file) {
+		echo "<p>unstaging file...</p>\n";
+		$args = Array ('reset', 'HEAD', $file);
+		debug ($args);
+		$h = start_command ('git', $args);
+		$str = get_all_data ($h, 'stderr');
+		debug ($str);
+		$exit = get_exit_code ($h);
+		var_dump ($exit);
+//		debug ($diff);
+		clean_up ($h);
+	}
+
+	function staged_change_checker_error () {
+		error ('something went wrong when comparing the POST and current status of the files on disk, eventhough the previously calculated hashes were OK. Processing stopped. Sorry.');
+		exit ();
+	}
+
 	function handle_commit_req () {
-		global $enable_stats;
+		global $enable_stats, $enable_unstable_code;
 
 		echo html_header_message ('checking, before doing commit...');
 		echo html_form_start ();
@@ -108,10 +187,35 @@
 		if ($status ['hash'] != $_POST ['statushash'])
 			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
 		else {
-			error ('committing staged files: not implemented yet ! Sorry');
+			if ($enable_unstable_code) {
+				do_commit ($_POST ['commit_message']);
+
+				$status = get_status ();
+			} else
+				error ('committing staged files: not implemented yet ! Sorry');
 		}
 
 		view_result ($status);
+	}
+
+	function do_commit ($msg = false) {
+		$tmp = tempnam ('/tmp', 'git-commit');
+		$fp = fopen ($tmp, 'w+');
+		fwrite ($fp, $msg);
+		fclose ($fp);
+
+		echo "<p>commiting changed files...</p>\n";
+		$args = Array ('commit', '-F', $tmp);
+		debug ($args);
+		$h = start_command ('git', $args);
+		$str = get_all_data ($h, 'stderr');
+		debug ($str);
+		$exit = get_exit_code ($h);
+		var_dump ($exit);
+//		debug ($diff);
+		clean_up ($h);
+
+		unlink ($tmp);
 	}
 
 	function html_header_message ($str = '') {
@@ -338,37 +442,43 @@ HERE;
 			$disabled = '';
 
 return <<<HERE
-<div id="${prefix}_div" class="filename_div"><span class="checkbox_span" id="${prefix}_checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}_checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
+<div id="${prefix}_container"><div id="${prefix}_div" class="filename_div"><span class="checkbox_span" id="${prefix}_checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}_checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
 <input id="${prefix}_filename" type="hidden" name="filename[]" value="$filename">
 <input id="${prefix}_hash" type="hidden" name="hash[]" value="$hash">
 <input id="${prefix}_prefix" type="hidden" name="prefix[]" value="$prefix">
 <textarea id="${prefix}_textarea">$diff</textarea>
-<script>$js</script>
+<script>$js</script></div>
 HERE;
 	}
 
 	function start_command ($command, $argarr, $blocking = true) {
 		$descriptorspec = array(
-			0 => array("pipe", "r"),  // stdin
-			1 => array("pipe", "w"),  // stdout
-			2 => array("pipe", "r"),  // stderr
+			0 => Array ('pipe', 'r'),  // stdin
+			1 => Array ('pipe', 'w'),  // stdout
+			2 => Array ('pipe', 'w'),  // stderr
 		);
+
+		$pipes = Array ();
 
 		$args = '';
 
-		foreach ($argarr as $v) {
+		foreach ($argarr as $v)
 			$args .= ' '. escapeshellarg ($v);
-		}
 
 		$command = escapeshellcmd ($command);
 
-		$proc = proc_open($command . ' ' . $args, $descriptorspec, $pipes);
+		$proc = proc_open($command . ' ' . $args, $descriptorspec, &$pipes);
 
 		if (is_resource($proc)) {
 			if ($blocking === false) {
 				stream_set_blocking ($pipes [0], 0);
 				stream_set_blocking ($pipes [1], 0);
 				stream_set_blocking ($pipes [2], 0);
+			} else {
+				// should be the default
+				stream_set_blocking ($pipes [0], 1);
+				stream_set_blocking ($pipes [1], 1);
+				stream_set_blocking ($pipes [2], 1);
 			}
 
 			global $_handles, $_handlecount;
@@ -390,9 +500,9 @@ HERE;
 
 		// It is important that you close any pipes before calling
 		// proc_close in order to avoid a deadlock
-		@fclose ($arr[0]);
-		@fclose ($arr[1]);
-		@fclose ($arr[2]);
+		@fclose ($_handles [$h][0]);
+		@fclose ($_handles [$h][1]);
+		@fclose ($_handles [$h][2]);
 
 		if ((!isset ($_handles [$h]['running'])) || ($_handles [$h]['running'] !== false))
 			$rv = proc_close ($_handles [$h] ['proc']);
@@ -416,7 +526,24 @@ HERE;
 		return false;
 	}
 
-		
+	function put_in_stdin ($h, $str) {
+		global $_handles;
+
+		if (!isset ($_handles [$h]))
+			return false;
+
+		return fwrite ($_handles [$h][0]);
+	}
+
+	function close_stdin ($h) {
+		global $_handles;
+
+		if (!isset ($_handles [$h]))
+			return false;
+
+		return @fclose ($_handles [$h][0]);
+	}
+
 	function get_stdout_line ($h) {
 		return _get_line ($h, 0);
 	}
@@ -515,8 +642,11 @@ HERE;
 		if (isset ($_handles [$h]['done']) && $_handles [$h]['done'])
 			return $_handles [$h]['stdout'];
 
+		// if $rv == false we return false at the end
 		if ($type == 'stdout')
-			$rv = stream_get_contents ($_handles[$h][1]); // if $rv == false we return false at the end
+			$rv = stream_get_contents ($_handles[$h][1]);
+		elseif ($type == 'stderr')
+			$rv = stream_get_contents ($_handles[$h][2]);
 
 		$status = proc_get_status ($_handles[$h]['proc']);
 
@@ -599,6 +729,8 @@ HERE;
 		if ($h === false)
 			return error ('command failed to start');
 		else {
+			close_stdin ($h);
+
 			$err = '';
 			$out = '';
 
@@ -684,11 +816,12 @@ HERE;
 //					debug ("new file !");
 					$command = 'diff';
 					$args = Array ('-u', '/dev/null', $parsed ['file']);
-					if ($parsed ['staged'] == 'A') {
+					if (isset ($parsed ['staged']) && $parsed ['staged'] == 'A') {
 						$args = Array ('diff', '--cached', $parsed ['file']);
 						$command = 'git';
 					}
 					$h = start_command ($command, $args);
+					close_stdin ($h);
 					$diff = htmlentities (get_all_data ($h));
 //					debug ($diff);
 					clean_up ($h);
@@ -708,6 +841,7 @@ HERE;
 						$args = Array ('diff', '--cached', $parsed ['file']);
 
 					$h = start_command ('git', $args);
+					close_stdin ($h);
 					$str = get_all_data ($h);
 //					debug ($str);
 					$diff = htmlentities ($str);
@@ -728,6 +862,7 @@ HERE;
 //					debug ($parsed);
 					$args = Array ('diff', '--', $parsed ['file']);
 					$h = start_command ('git', $args);
+					close_stdin ($h);
 					$str = get_all_data ($h);
 //					debug ($str);
 					$diff = htmlentities ($str);
@@ -747,6 +882,7 @@ HERE;
 //					debug ($parsed);
 					$args = Array ('diff', '--cached', '--', $parsed ['file']);
 					$h = start_command ('git', $args);
+					close_stdin ($h);
 					$str = get_all_data ($h);
 //					debug ($str);
 					$diff = htmlentities ($str);
@@ -864,8 +1000,6 @@ _______________
 
 Short term TODO-list:
 
-- html_file should use the hash for the prefixes ? -> no, see UI-technical technical implementation ideas below
-- html_file output needs a container (extra DIV around all the elements)
 - need a function to dynamically update the html_header_message output (starting with the refresh request, it should let the user know it is done refreshing)
 - get_status () and friends should be able to disable the HTML-elements by default
 - need a function to dynamically enable previously disabled HTML-elements

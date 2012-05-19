@@ -138,12 +138,13 @@
 	}
 
 	function stage_file ($file, $status) {
-
 		echo html_header_message_update ("staging file $file");
+
 		if ($status ['state'] == 'Deleted')
 			$args = Array ('rm', $file);
 		else
 			$args = Array ('add', $file);
+
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
 		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
@@ -164,8 +165,9 @@
 		}
 	}
 
-	function unstage_file ($file) {
+	function unstage_file ($file, $status) {
 		echo html_header_message_update ("unstaging file: $file");
+
 		$args = Array ('reset', 'HEAD', $file);
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
@@ -176,7 +178,12 @@
 		debug ($exit);
 		clean_up ($h);
 
-		if ($exit == 1)
+		if ($status ['state'] == 'New')
+			$valid = 0;
+		else
+			$valid = 1;
+
+		if ($exit == $valid)
 			echo html_header_message_update ("unstaging file: $file: OK");
 		else {
 			echo html_header_message_update ("unstaging file: $file: ".'<span class="error">FAILED</a>', true);

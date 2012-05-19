@@ -178,7 +178,7 @@
 		debug ($exit);
 		clean_up ($h);
 
-		if ($status ['state'] == 'New')
+		if ($status ['state'] == 'New' || $status ['state'] == 'Renamed')
 			$valid = 0;
 		else
 			$valid = 1;
@@ -868,7 +868,7 @@ HERE;
 
 	function parse_line ($str) {
 		global $sha1_empty_string;
-	
+
 		$str = rtrim ($str);
 		$file = substr ($str, 3);
 
@@ -888,9 +888,12 @@ HERE;
 			$res = Array ('strstaged' => ' ', 'strmodified' => 'D', 'str' => $str, 'file' => $file, 'hash' => $sha1_empty_string);
 		} elseif ($str [0] == 'D' && $str [1] == ' ') {
 			$res = Array ('strstaged' => 'D', 'strmodified' => ' ', 'str' => $str, 'file' => $file, 'hash' => $sha1_empty_string);
-		} else {
+		} elseif ($str [0] == 'R') {
+			$sub = substr ($str, 4);
+			$arr = explode (' -> ', $sub);
+			$res =  Array ('strstaged' => 'R', 'strmodified' => ' ', 'str' => $str, 'oldfile' => $arr [0], 'newfile' => $arr [1], 'hash' => get_file_hash ($arr[1]), 'file' => $arr[1]);
+		} else
 			$res = Array ('str' => $str);
-		}
 
 		return $res;
 	}
@@ -992,26 +995,47 @@ HERE;
 				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
 				echo $str;
 				$parsed ['prefix'] = $prefix;
+			} elseif ($parsed ['strstaged'] == 'R') {
+				if ($makediff) {
+					$args = Array ('diff', '--cached', '--', $parsed ['file']);
+					$h = start_command ('git', $args);
+					close_stdin ($h);
+					$str = get_all_data ($h);
+//					debug ($str);
+					$diff = htmlentities ($str);
+					$exit = get_exit_code ($h);
+//					var_dump ($exit);
+//					debug ($diff);
+					clean_up ($h);
+				} else
+					$diff = false;
+
+				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
+				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
+
+				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+				echo $str;
+				$parsed ['prefix'] = $prefix;
 			} else {
-				error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
-
-				debug ($parsed, true);
-
-				exit ();
+				interpret_not_supported ($parsed);
 			}
-		} else {
-			error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
+		} else
+			interpret_not_supported ($parsed);
 
-			debug ($parsed, true);
-
-			exit ();
-		}
 		return $parsed;
+	}
+
+	function interpret_not_supported ($parsed) {
+		error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
+
+		debug ($parsed, true);
+
+		exit ();
 	}
 
 	function set_state ($modified, $staged) {
 		$rv = $modified; // last resort ?
-	
+
 		if ($modified == '?' || $staged == 'A')
 			$rv = 'New';
 
@@ -1020,6 +1044,9 @@ HERE;
 
 		if ($modified == 'M' || $staged == 'M')
 			$rv = 'Modified';
+
+		if ($staged == 'R')
+			$rv = 'Renamed';
 
 		return $rv;
 	}
@@ -1030,13 +1057,7 @@ HERE;
 		if ($staged == ' ' || $staged == '?')
 			$rv = 'N';
 
-		if ($staged == ' ')
-			$rv = 'N';
-
-		if ($staged == '?')
-			$rv = 'N';
-
-		if ($staged == 'Y' || $staged == 'M' || $staged == 'A' || $staged == 'D')
+		if ($staged == 'Y' || $staged == 'M' || $staged == 'A' || $staged == 'D' || $staged == 'R')
 			$rv = 'Y';
 
 		return $rv;
@@ -1106,5 +1127,19 @@ UI technical implementation ideas:
 - send timestamp-based prefixes in the POST to the server
 - the server can than just send whole containers to the client
 - and use appendChild/insertBefore/removeChild to insert it in the DOM in the right place, removing the old container, if any.
+
+__________
+
+Long term TODO-list:
+
+
+__________
+
+add directory:
+
+$ git add fsadadfs/
+$ echo $?
+0
+
 
 */

@@ -1,17 +1,10 @@
 <?php
-
 	error_reporting (E_ALL);
 
 	/// settings ///
 
 	$debug = false;
-
-	$enable_unstable_code = false;
-	$enable_unstable_code = true;
-
-	if ($enable_unstable_code) {
-//		$debug = true;
-	}
+//	$debug = true;
 
 	$enable_stats = false; // not available yet
 
@@ -87,91 +80,107 @@
 		echo html_form_start ();
 
 		view_result ();
+		echo html_header_message_update ('refreshing... done');
 	}
 
 	function handle_change_staged_req () {
-		global $enable_stats, $enable_unstable_code;
+		global $enable_stats;
 
 		echo html_header_message ('checking, before handling staging...');
 		echo html_form_start ();
 
-		if ($enable_unstable_code)
-			$status = get_status (true, false, false);
-		else
-			$status = get_status ();
+		$status = get_status (true, false, false);
 
 		if ($status ['hash'] != $_POST ['statushash'])
 			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
 		else {
-			if ($enable_unstable_code) {
-				debug ("doing staging/unstaging...");
+			echo html_header_message_update ('doing staging/unstaging...');
 
-				$num1 = 0;
-				$num2 = 0;
+			$num1 = 0;
+			$num2 = 0;
 
-				$arr = Array ();
+			$arr = Array ();
 
-				foreach ($status ['lines'] as $v)
-					$arr [] = $v ['file'];
+			foreach ($status ['lines'] as $v)
+				$arr [] = $v ['file'];
 
-				$poststaged = Array ();
+			$poststaged = Array ();
 
-				if (isset ($_POST ['stagecheckbox']))
-					foreach ($_POST ['stagecheckbox'] as $v) {
-						$key = array_search ($v, $_POST ['hash']);
-						if ($key !== false)
-							$poststaged [$key] = 'Y';
-					}
-
-				$max = count ($_POST ['filename']);
-				if ($max !== count ($arr))
-					staged_change_checker_error ();
-
-				for ($i = 0; $i < $max; $i++) {
-					if ($_POST ['filename'] [$i] !== $arr [$i]) 
-						staged_change_checker_error ();
-
-					if ($status ['lines'][$i]['staged'] == 'N' && isset ($poststaged [$i]) && $poststaged [$i] == 'Y')
-						stage_file ($arr [$i]);
-
-					if ($status ['lines'][$i]['staged'] == 'Y' && !isset ($poststaged [$i]))
-						unstage_file ($arr [$i]);
-
-					echo html_js_remove_container ($status ['lines'][$i]['prefix']);
+			if (isset ($_POST ['stagecheckbox']))
+				foreach ($_POST ['stagecheckbox'] as $v) {
+					$key = array_search ($v, $_POST ['hash']);
+					if ($key !== false)
+						$poststaged [$key] = 'Y';
 				}
 
-				$status = get_status (false, true, $enable_stats);
-			} else
-				error ('changing changed: not implemented yet ! Sorry');
+			$max = count ($_POST ['filename']);
+			if ($max !== count ($arr))
+				staged_change_checker_error ();
+
+			for ($i = 0; $i < $max; $i++) {
+				if ($_POST ['filename'] [$i] !== $arr [$i]) 
+					staged_change_checker_error ();
+
+				if ($status ['lines'][$i]['staged'] == 'N' && isset ($poststaged [$i]) && $poststaged [$i] == 'Y')
+					stage_file ($arr [$i]);
+
+				if ($status ['lines'][$i]['staged'] == 'Y' && !isset ($poststaged [$i]))
+					unstage_file ($arr [$i]);
+
+				echo html_js_remove_container ($status ['lines'][$i]['prefix']);
+			}
+
+			$status = get_status (false, true, $enable_stats);
 		}
 
 		view_result ($status);
+		echo html_header_message_update ('doing staging/unstaging... done');
 	}
 
 	function stage_file ($file) {
-		debug ("staging file $file");
+		echo html_header_message_update ("staging file $file");
 		$args = Array ('add', $file);
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
-		$str = get_all_data ($h, 'stderr');
-		debug ($str);
+		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
+		debug ("stdout: $stdout");
+		debug ("stderr: $stderr");
 		$exit = get_exit_code ($h);
 		debug ($exit);
-//		debug ($diff);
 		clean_up ($h);
+
+		if ($exit === 0) 
+			echo html_header_message_update ("staging file $file: OK");
+		else {
+			echo html_header_message_update ("staging file $file: ".'<span class="error">FAILED</a>', true);
+			if (trim ($stderr) != '')
+				error ("$stderr");
+			echo html_form_end ();
+			exit ();
+		}
 	}
 
 	function unstage_file ($file) {
-		debug ("unstaging file: $file");
+		echo html_header_message_update ("unstaging file: $file");
 		$args = Array ('reset', 'HEAD', $file);
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
-		$str = get_all_data ($h, 'stderr');
-		debug ($str);
+		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
+		debug ("stdout: $stdout");
+		debug ("stderr: $stderr");
 		$exit = get_exit_code ($h);
 		debug ($exit);
-//		debug ($diff);
 		clean_up ($h);
+
+		if ($exit == 1)
+			echo html_header_message_update ("unstaging file: $file: OK");
+		else {
+			echo html_header_message_update ("unstaging file: $file: ".'<span class="error">FAILED</a>', true);
+			if (trim ($stderr) != '')
+				error ("$stderr");
+			echo html_form_end ();
+			exit ();
+		}
 	}
 
 	function staged_change_checker_error () {
@@ -180,31 +189,23 @@
 	}
 
 	function handle_commit_req () {
-		global $enable_stats, $enable_unstable_code, $somethingstaged;
+		global $enable_stats;
 
 		echo html_header_message ('checking, before doing commit...');
 		echo html_form_start ();
 
-		if ($enable_unstable_code)
-			$status = get_status (true, false, false);
-		else
-			$status = get_status ();
+		$status = get_status (true, false, false);
 
 		if ($status ['hash'] != $_POST ['statushash'])
 			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
 		else {
-			if ($enable_unstable_code) {
-				do_commit ($_POST ['commit_message']);
+			do_commit ($_POST ['commit_message']);
 
-				$max = count ($_POST ['filename']);
-				for ($i = 0; $i < $max; $i++)
-					echo html_js_remove_container ($status ['lines'][$i]['prefix']);
+			$max = count ($_POST ['filename']);
+			for ($i = 0; $i < $max; $i++)
+				echo html_js_remove_container ($status ['lines'][$i]['prefix']);
 
-				$somethingstaged = false;
-
-				$status = get_status ();
-			} else
-				error ('committing staged files: not implemented yet ! Sorry');
+			$status = get_status ();
 		}
 
 		view_result ($status);
@@ -216,18 +217,27 @@
 		fwrite ($fp, $msg);
 		fclose ($fp);
 
-		debug ("commiting changed files...");
+		echo html_header_message_update ("commiting changed files...");
 		$args = Array ('commit', '-F', $tmp);
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
-		$str = get_all_data ($h, 'stderr');
-		debug ($str);
+		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
+		debug ("stdout: $stdout");
+		debug ("stderr: $stderr");
 		$exit = get_exit_code ($h);
 		debug ($exit);
-//		debug ($diff);
 		clean_up ($h);
-
 		unlink ($tmp);
+
+		if ($exit === 0)
+			echo html_header_message_update ("commiting changed files... OK");
+		else {
+			echo html_header_message_update ('commiting changed files...: <span class="error">FAILED</a>', true);
+			if (trim ($stderr) != '')
+				error ("$stderr");
+			echo html_form_end ();
+			exit ();
+		}
 	}
 
 	function html_js_remove_container ($prefix) {
@@ -241,7 +251,22 @@ HERE;
 	}
 
 	function html_header_message ($str = '') {
-		return ('<div id="headermessage">'.$str.'</div>'."\n");
+		return <<<HERE
+		<div id="headermessage">$str</div>
+HERE;
+	}
+
+	function html_header_message_update ($str = '', $no_encode = false) {
+		if ($no_encode === false)
+			$str = htmlentities ($str);
+		return <<<HERE
+		<script>
+			(function () {
+				var el = document.getElementById ('headermessage');
+				el.innerHTML = '$str';
+			}) ();
+		</script>
+HERE;
 	}
 
 	function html_form_start () {
@@ -313,6 +338,7 @@ return <<<HERE
 	.filelist_header { font-weight: bold; }
 	.checkbox { border: 1px solid black; }
 	#commit_message { margin-top: $margin; }
+	.error { font-weight: bold; color: red; }
 HERE;
 	}
 
@@ -657,20 +683,38 @@ HERE;
 		return $rv;
 	}
 
-	function get_all_data ($h, $type = 'stdout') {
+	function get_all_data ($h, $intype = 'stdout') {
 		global $_handles;
 
 		if (!isset ($_handles [$h]))
 			return false;
 
-		if (isset ($_handles [$h]['done']) && $_handles [$h]['done'])
-			return $_handles [$h]['stdout'];
+		if (!is_array ($intype))
+			$types = Array ($intype);
+		else
+			$types = $intype;
 
-		// if $rv == false we return false at the end
-		if ($type == 'stdout')
-			$rv = stream_get_contents ($_handles[$h][1]);
-		elseif ($type == 'stderr')
-			$rv = stream_get_contents ($_handles[$h][2]);
+		$rv = Array ();
+
+		if (isset ($_handles [$h]['done']) && $_handles [$h]['done']) {
+			foreach ($types as $k => $type)
+				$rv [$k] = $_handles [$h][$type];
+
+			if (!is_array ($intype))
+				return $rv [0];
+
+			return $rv;
+		}
+
+// XXX BUG: possibly a second call to function will fail, if done was false the first time and done = true second time.
+
+		foreach ($types as $k => $type) {
+			// if $rv == false we return false at the end
+			if ($type == 'stdout')
+				$rv [$k] = stream_get_contents ($_handles[$h][1]);
+			elseif ($type == 'stderr')
+				$rv [$k] = stream_get_contents ($_handles[$h][2]);
+		}
 
 		$status = proc_get_status ($_handles[$h]['proc']);
 
@@ -681,6 +725,9 @@ HERE;
 
 		$_handles [$h]['rv'] = $return_value;
 		$_handles [$h]['running'] = false;
+
+		if (!is_array ($intype))
+			return $rv [0];
 
 		return $rv;
 	}
@@ -736,8 +783,9 @@ HERE;
 	function make_one_hash ($rs) {
 		$str = '';
 	
-		foreach ($rs ['lines'] as $v)
-			$str .= $v ['hash'];
+		if (isset ($rs ['lines']) && is_array ($rs ['lines']))
+			foreach ($rs ['lines'] as $v)
+				$str .= $v ['hash'];
 
 		$str .= $rs ['outputhash'];
 		
@@ -745,7 +793,11 @@ HERE;
 	}
 
 	function get_status ($disabled = false, $makediff = true, $stats = false) {
+		global $somethingstaged;
+
 		$result = Array ();
+
+		$somethingstaged = false;
 
 		clearstatcache ();
 
@@ -798,7 +850,7 @@ HERE;
 
 	function get_file_hash ($file) {
 		if (file_exists ($file))
-			return sha1_file ($file);
+			return sha1 ($file . sha1_file ($file));
 
 		return false;
 	}

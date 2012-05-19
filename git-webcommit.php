@@ -168,6 +168,8 @@
 	function unstage_file ($file, $status) {
 		echo html_header_message_update ("unstaging file: $file");
 
+		debug ($status);
+
 		$args = Array ('reset', 'HEAD', $file);
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
@@ -178,12 +180,7 @@
 		debug ($exit);
 		clean_up ($h);
 
-		if ($status ['state'] == 'New' || $status ['state'] == 'Renamed')
-			$valid = 0;
-		else
-			$valid = 1;
-
-		if ($exit == $valid)
+		if ($exit == 0 || $exit == 1) // 0 is nothing staged, 1 still something staged
 			echo html_header_message_update ("unstaging file: $file: OK");
 		else {
 			echo html_header_message_update ("unstaging file: $file: ".'<span class="error">FAILED</a>', true);
@@ -231,7 +228,7 @@
 		fclose ($fp);
 
 		echo html_header_message_update ("commiting changed files...");
-		$args = Array ('commit', '-F', $tmp);
+		$args = Array ('commit', '--no-status', '-F', $tmp);
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
 		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
@@ -344,7 +341,7 @@ return <<<HERE
 	PRE { color: purple; } /* debug */
 	BODY { background-color: white; }
 	TEXTAREA { display: none; width: $totalwidth; height: 300px; border: 1px solid black; }
-	.filename_div { border: 1px solid black; width: $totalwidth; padding-top: 3px; padding-bottom: 3px; margin-top: $margin; margin-bottom: $margin; }
+	.filename_div { border: 1px solid black; width: $totalwidth; padding-top: 3px; padding-bottom: 3px; margin-top: $margin; margin-bottom: $margin; overflow: hidden; }
 	.state_span, .staged_span, .checkbox_span { float: left; padding-left: $padding; padding-right: $padding; }
 	.staged_span { width: 60px; }
 	.state_span { width: 100px; }
@@ -501,7 +498,7 @@ HERE;
 			$disabled = '';
 
 $str = <<<HERE
-<div id="${prefix}_container"><div id="${prefix}_div" class="filename_div"><span class="checkbox_span" id="${prefix}_checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}_checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
+<div id="${prefix}_container"><div title="$filename" id="${prefix}_div" class="filename_div"><span class="checkbox_span" id="${prefix}_checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}_checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
 <input id="${prefix}_filename" type="hidden" name="filename[]" value="$filename">
 <input id="${prefix}_hash" type="hidden" name="hash[]" value="$hash">
 <input id="${prefix}_prefix" type="hidden" name="prefix[]" value="$prefix">
@@ -806,7 +803,7 @@ HERE;
 	function get_status ($disabled = false, $makediff = true, $stats = false) {
 		global $somethingstaged;
 
-		$result = Array ();
+		$result = Array ('lines' => Array ());
 
 		$somethingstaged = false;
 
@@ -829,7 +826,11 @@ HERE;
 					$parsed = parse_line ($line);
 					$int = interpret ($parsed, $disabled, $makediff, $stats);
 					if ($int !== false) {
-						$result ['lines'][] = $int;
+						if (isset ($int ['dir'])) {
+							$list = add_directory_listing ($parsed ['dir'], $disabled, $makediff, $stats);
+							$result ['lines'] = array_merge ($result ['lines'], $list);
+						} else
+							$result ['lines'][] = $int;
 					}
 
 					flush ();
@@ -1016,19 +1017,61 @@ HERE;
 				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
 				echo $str;
 				$parsed ['prefix'] = $prefix;
+			} else
+				interpret_not_supported ($parsed);
+		} else {
+			if (isset ($parsed ['dir']) && $parsed ['strmodified'] == '?' && $parsed ['strstaged'] == '?') {
+//				echo "is dir";
 			} else {
 				interpret_not_supported ($parsed);
 			}
-		} else
-			interpret_not_supported ($parsed);
+		}
 
 		return $parsed;
 	}
 
-	function interpret_not_supported ($parsed) {
+	function add_directory_listing ($dir, $disabled, $makediff, $stats, $list = false) {
+		if ($list === false)
+			$list = Array ();
+
+		$handle = opendir ($dir);
+		while (($entry = readdir ($handle)) !== false)
+			if ($entry != '.' && $entry != '..') {
+				$type = filetype ($dir . $entry);
+				if ($type == 'file') {
+					$file = $dir . $entry;
+//					echo '<p>'. $dir . $entry . "</p>\n";
+					$hash = get_file_hash ($file);
+					$parsed = Array ('file' => $file, 'hash' => $hash);
+					$parsed ['state'] = 'New';
+					$parsed ['staged'] = 'N';
+					if ($makediff) {
+						$command = 'diff';
+						$args = Array ('-u', '/dev/null', $parsed ['file']);
+						$h = start_command ($command, $args);
+						close_stdin ($h);
+						$diff = htmlentities (get_all_data ($h));
+//						debug ($diff);
+						clean_up ($h);
+					} else
+						$diff = false;
+					list ($str, $prefix) = html_file ($file, $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
+					echo $str;
+					$parsed ['prefix'] = $prefix;
+					$list [] = $parsed;
+				} elseif ($type == 'dir') {
+					add_directory_listing ($dir . $entry . '/', $disabled, $makediff, $stats, &$list);
+				} else
+					interpret_not_supported ($dir . $entry);
+			}
+
+		return $list;
+	}
+
+	function interpret_not_supported ($debug) {
 		error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
 
-		debug ($parsed, true);
+		debug ($debug, true);
 
 		exit ();
 	}

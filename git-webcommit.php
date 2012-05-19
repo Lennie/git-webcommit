@@ -212,6 +212,8 @@
 	}
 
 	function do_commit ($msg = false) {
+		global $commit_message;
+
 		$tmp = tempnam ('/tmp', 'git-commit');
 		$fp = fopen ($tmp, 'w+');
 		fwrite ($fp, $msg);
@@ -229,9 +231,10 @@
 		clean_up ($h);
 		unlink ($tmp);
 
-		if ($exit === 0)
+		if ($exit === 0) {
 			echo html_header_message_update ("commiting changed files... OK");
-		else {
+			$commit_message = '';
+		} else {
 			echo html_header_message_update ('commiting changed files...: <span class="error">FAILED</a>', true);
 			if (trim ($stderr) != '')
 				error ("$stderr");
@@ -367,7 +370,6 @@ function enable_disable_buttons () {
 		if (something_to_commit) {
 			if (msg) {
 				msg.style.display = 'block';
-				msg.disabled = false;
 				if (msg.value != '' && button2)
 					button2.disabled = false;
 				else
@@ -379,10 +381,8 @@ function enable_disable_buttons () {
 			if (button2)
 				button2.disabled = true;
 
-			if (msg) {
+			if (msg)
 				msg.style.display = 'none';
-				msg.disabled = true;
-			}
 		}
 	}
 }

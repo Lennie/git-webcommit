@@ -122,10 +122,10 @@
 					staged_change_checker_error ();
 
 				if ($status ['lines'][$i]['staged'] == 'N' && isset ($poststaged [$i]) && $poststaged [$i] == 'Y')
-					stage_file ($arr [$i]);
+					stage_file ($arr [$i], $status ['lines'][$i]);
 
 				if ($status ['lines'][$i]['staged'] == 'Y' && !isset ($poststaged [$i]))
-					unstage_file ($arr [$i]);
+					unstage_file ($arr [$i], $status ['lines'][$i]);
 
 				echo html_js_remove_container ($status ['lines'][$i]['prefix']);
 			}
@@ -137,9 +137,13 @@
 		echo html_header_message_update ('doing staging/unstaging... done');
 	}
 
-	function stage_file ($file) {
+	function stage_file ($file, $status) {
+
 		echo html_header_message_update ("staging file $file");
-		$args = Array ('add', $file);
+		if ($status ['state'] == 'Deleted')
+			$args = Array ('rm', $file);
+		else
+			$args = Array ('add', $file);
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
 		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));

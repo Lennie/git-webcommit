@@ -34,3 +34,4 @@ Missing, but planned features:
 - editing .gitignore
 - ondemand diffs
 - repository chooser
+- amend commit

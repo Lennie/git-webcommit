@@ -3,25 +3,34 @@
 
 	/// settings ///
 
-	$debug = false;
-//	$debug = true;
+	// configure the list of repositories, only one support at the moment
+	$repos = Array ('/some/dir');
+
+	// set the default repository, you probably want to keep it set to 0
+	$defaultrepo = 0;
+
+	// configure the authentication method:
+//	$authmethod = 'httpbasic';
+//	$authmethod = 'htpasswd';
+	$authmethod = 'none';
+
+	// when using htpasswd, the 'pass' entry isn't needed
+	// 'name' and 'email' are required.
+	$auth = Array (
+		'testuser2' => Array ('pass' => 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3', 'name' => 'Test User', 'email' => 'test@somewhere')
+	);
+
+	// passwords are sha1 hashes, uncomment next line to create the password hash:
+//	exit (sha1 ('my pass'));
+
+	// author for when you don't use authentication
+//	$author = $auth ['testuser2']['name'] . '<' . $auth ['testuser2']['email'] . '>'; // 'firstname lastname <email-address>'
+	$author = '';
 
 	$enable_stats = false; // not available yet
 
-	$repos = Array ('/some/dir');
-
-	$defaultrepo = 0;
-
-	// passwords are sha1 hashes
-//	exit (sha1 ('my pass'));
-	$auth = Array ('testuser2' => Array ('pass' => 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3', 'name' => 'Test User', 'email' => 'test@somewhere'));
-
-//	$authmethod = 'httpbasic';
-	$authmethod = 'htpasswd';
-//	$authmethod = 'none';
-
-//	$author = $auth ['testuser2']['name'] . '<' . $auth ['testuser2']['email'] . '>'; // author 'firstname lastname <email-address>' for when you don't use authentication
-	$author = '';
+	$debug = false;
+//	$debug = true;
 
 	/// main ///
 
@@ -272,7 +281,7 @@
 	function html_js_remove_container ($prefix) {
 return <<<HERE
 		<script>( function () {
-			var el = document.getElementById ('${prefix}_container');
+			var el = document.getElementById ('${prefix}_div');
 			if (el)
 				el.parentNode.removeChild (el);
 		}) ();</script>
@@ -281,7 +290,7 @@ HERE;
 
 	function html_header_message ($str = '') {
 		return <<<HERE
-		<div id="headermessage">$str</div>
+		<p id="headermessage">$str</p>
 HERE;
 	}
 
@@ -302,6 +311,13 @@ HERE;
 return <<<HERE
 		<form method="POST">
 		<div class="filename_div filelist_header"><span class="checkbox_span">&nbsp;</span><span class="staged_span">Staged</span><span class="state_span">State</span><span class="filename_span">Filename</span></div>
+		<article>
+HERE;
+	}
+
+	function close_and_add_filelist_parent () {
+		return <<<HERE
+</article><article>
 HERE;
 	}
 
@@ -316,6 +332,7 @@ HERE;
 			$commit_message = htmlentities ($commit_message);
 
 return <<<HERE
+		</article>
 		<input id="change_staged" type="submit" name="change_staged" value="change staged">
 		<input id="submit_commit" type="submit" name="commit" value="commit">
 		<input id="submit_refresh" type="submit" name="refresh" value="refresh">
@@ -323,6 +340,7 @@ return <<<HERE
 		<textarea id="commit_message" name="commit_message">$commit_message</textarea>
 		</form>
 		<script>something_to_commit = $something_to_commit; enable_disable_buttons (); handle_commit_textarea ();</script>
+		
 HERE;
 	}
 
@@ -357,9 +375,10 @@ HERE;
 
 return <<<HERE
 	PRE { color: purple; } /* debug */
-	BODY { background-color: white; }
+	BODY { background-color: #fff; }
 	TEXTAREA { display: none; width: $totalwidth; height: 300px; border: 1px solid black; }
-	.filename_div { border: 1px solid black; width: $totalwidth; padding-top: 3px; padding-bottom: 3px; margin-top: $margin; margin-bottom: $margin; overflow: hidden; }
+	ARTICLE DIV:nth-child(even) { background-color: #efefef }
+	.filename_div { border: 1px solid black; width: $totalwidth; padding-top: 3px; padding-bottom: 3px; margin-top: $margin; margin-bottom: $margin; overflow: hidden; background-color: inherit}
 	.state_span, .staged_span, .checkbox_span { float: left; padding-left: $padding; padding-right: $padding; }
 	.staged_span { width: 60px; }
 	.state_span { width: 100px; }
@@ -516,7 +535,7 @@ HERE;
 			$disabled = '';
 
 $str = <<<HERE
-<div id="${prefix}_container"><div title="$filename" id="${prefix}_div" class="filename_div"><span class="checkbox_span" id="${prefix}_checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}_checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span></div>
+<div title="$filename" id="${prefix}_div" class="filename_div"><span class="checkbox_span" id="${prefix}_checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}_checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span>
 <input id="${prefix}_filename" type="hidden" name="filename[]" value="$filename">
 <input id="${prefix}_hash" type="hidden" name="hash[]" value="$hash">
 <input id="${prefix}_prefix" type="hidden" name="prefix[]" value="$prefix">
@@ -820,6 +839,16 @@ HERE;
 	function get_status ($disabled = false, $makediff = true, $stats = false) {
 		global $somethingstaged;
 
+		static $firstrun;
+
+		if (!isset ($firstrun))
+			$firstrun = true;
+		else
+			$firstrun = false;
+
+		if (!$firstrun)
+			echo close_and_add_filelist_parent ();
+
 		$result = Array ('lines' => Array ());
 
 		$somethingstaged = false;
@@ -1113,6 +1142,9 @@ HERE;
 
 	function handle_htpasswd_auth () {
 		global $auth;
+
+		if (!isset ($_SERVER['REMOTE_USER']))
+			exit ('htpasswd not setup correctly');
 
 		if (isset ($_SERVER['REMOTE_USER']) && isset ($auth [$_SERVER ['REMOTE_USER']]))
 			return $auth [$_SERVER ['REMOTE_USER']]['name'] . ' <'.$auth [$_SERVER ['REMOTE_USER']]['email'].'>';

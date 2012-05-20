@@ -1086,8 +1086,6 @@ function handle_fileline (prefix, check, disable) {
 					staged_checked_changed++;
 
 				enable_disable_buttons ();
-
-				e.stopPropagation ();
 			}
 		});
 	}
@@ -1095,13 +1093,21 @@ function handle_fileline (prefix, check, disable) {
 	if (!disable) {
 		var el = document.getElementById (prefix+'_div');
 		if (el)
-			el.addEventListener ('click', function () {
-				var el2 = document.getElementById (prefix+'_textarea');
-				if (el2) {
-					if (el2.style.display == 'block')
-						el2.style.display = 'none'
-					else
-						el2.style.display = 'block';
+			el.addEventListener ('click', function (e) {
+
+			var classname = '';
+
+			if (e.target && e.target.className)
+				classname = ' '+e.target.className+' ';
+
+				if (classname.indexOf (' filename_span ') >= 0 || classname.indexOf (' filename_div ') >= 0 || classname.indexOf (' staged_span ') >= 0 || classname.indexOf (' state_span ') >= 0) {
+					var el2 = document.getElementById (prefix+'_textarea');
+					if (el2) {
+						if (el2.style.display == 'block')
+							el2.style.display = 'none'
+						else
+							el2.style.display = 'block';
+					}
 				}
 			});
 	}

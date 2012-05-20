@@ -4,11 +4,17 @@ A tool to commit changed/new files from a directory on the webserver straight fr
 
 It is meant to NOT make changes to the files in directory, only append new history to the repository.
 
-Use cases:
+It also is not a repository browser/viewer.
+
+Example use cases:
 People working together on a project in a shared directory on a server. Which could be a WordPress or Drupal website
-where people want to keep track of changes in templates and plugins or people uploading documents to a webdav-share.
+where people want to keep track of changes made to templates and plugins or people uploading documents to a shared directory.
 
 [Screenshot: ][https://github.com/Lennie/git-webcommit/raw/master/screenshot.png]
+
+Basic workflow:
+When you visit the webpage it displays a list of added/removed/changed/renamed files, you click on the filename you might want
+to commit to see the diff, you stage the file(s), you write a commit message and commit.
 
 Installation/setup:
 All you need is a git repository on the server, change some settings at the top and upload the single PHP-file to your webserver.
@@ -27,3 +33,4 @@ Missing, but planned features:
 - listing .gitignore
 - editing .gitignore
 - ondemand diffs
+- repository chooser

@@ -25,7 +25,7 @@ Depends on as little as possible installed on the webserver:
 - diff
 - wc (for stats)
 
-Authentication can be handle by the webserver (htpasswd) or with a hash in the settings section of the PHP-file.
+Authentication can be handled by the webserver (htpasswd) or with a hash in the settings section of the PHP-file.
 
 Missing, but planned features:
 - diff stats: number of lines added/removed

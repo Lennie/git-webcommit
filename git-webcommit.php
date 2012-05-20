@@ -12,9 +12,23 @@
 
 	$defaultrepo = 0;
 
-	$auth = Array (); // not available yet
+	// passwords are sha1 hashes
+//	exit (sha1 ('my pass'));
+	$auth = Array ('testuser2' => Array ('pass' => 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3', 'name' => 'Test User', 'email' => 'test@somewhere'));
+
+//	$authmethod = 'httpbasic';
+	$authmethod = 'htpasswd';
+//	$authmethod = 'none';
+
+//	$author = $auth ['testuser2']['name'] . '<' . $auth ['testuser2']['email'] . '>'; // author 'firstname lastname <email-address>' for when you don't use authentication
+	$author = '';
 
 	/// main ///
+
+	if ($authmethod === 'httpbasic')
+		$author = handle_basic_auth ();
+	elseif ($authmethod === 'htpasswd')
+		$author = handle_htpasswd_auth ();
 
 	@ob_end_clean ();
 	flush ();
@@ -197,7 +211,7 @@
 	}
 
 	function handle_commit_req () {
-		global $enable_stats;
+		global $enable_stats, $author;
 
 		echo html_header_message ('checking, before doing commit...');
 		echo html_form_start ();
@@ -207,7 +221,7 @@
 		if ($status ['hash'] != $_POST ['statushash'])
 			error ('something changed in the directory and/or repository, not doing any changes ! Sorry');
 		else {
-			do_commit ($_POST ['commit_message']);
+			do_commit ($_POST ['commit_message'], $author);
 
 			$max = count ($_POST ['filename']);
 			for ($i = 0; $i < $max; $i++)
@@ -219,7 +233,7 @@
 		view_result ($status);
 	}
 
-	function do_commit ($msg = false) {
+	function do_commit ($msg = false, $author = '') {
 		global $commit_message;
 
 		$tmp = tempnam ('/tmp', 'git-commit');
@@ -229,6 +243,10 @@
 
 		echo html_header_message_update ("commiting changed files...");
 		$args = Array ('commit', '--no-status', '-F', $tmp);
+		if ($author != '') {
+			$args [] = '--author';
+			$args [] = $author;
+		}
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ('git', $args);
 		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
@@ -533,7 +551,7 @@ HERE;
 				stream_set_blocking ($pipes [1], 0);
 				stream_set_blocking ($pipes [2], 0);
 			} else {
-				// should be the default
+				// should already be the default
 				stream_set_blocking ($pipes [0], 1);
 				stream_set_blocking ($pipes [1], 1);
 				stream_set_blocking ($pipes [2], 1);
@@ -629,7 +647,6 @@ HERE;
 		if (!isset ($_handles [$h]))
 			return false;
 
-		/* Prepare the read array */
 		$read   = array($_handles[$h][1], $_handles[$h][2]);
 		$write  = NULL;
 		$except = NULL;
@@ -821,8 +838,6 @@ HERE;
 			while (!is_done ($h)) {
 				$line = get_stdout_line ($h);
 				if ($line != '') {
-//debug ('<hr>');
-
 					$parsed = parse_line ($line);
 					$int = interpret ($parsed, $disabled, $makediff, $stats);
 					if ($int !== false) {
@@ -850,13 +865,8 @@ HERE;
 			make_one_hash (&$result);
 		}
 
-//debug ('<hr>');
-
-//debug ($GLOBALS ['_handles'][$h]['stdout']);
-
 		clean_up ($h);
 
-//debug ('<hr>');
 		return $result;
 	}
 
@@ -901,10 +911,8 @@ HERE;
 
 	function interpret ($parsed, $disabled = false, $makediff = true, $stats = false) {
 		if (isset ($parsed ['file'])) {
-//			print_r ($parsed);
 			if ($parsed ['strstaged'] == '?' || $parsed ['strstaged'] == 'A') {
 				if ($makediff) {
-//					debug ("new file !");
 					$command = 'diff';
 					$args = Array ('-u', '/dev/null', $parsed ['file']);
 					if (isset ($parsed ['staged']) && $parsed ['staged'] == 'A') {
@@ -914,7 +922,6 @@ HERE;
 					$h = start_command ($command, $args);
 					close_stdin ($h);
 					$diff = htmlentities (get_all_data ($h));
-//					debug ($diff);
 					clean_up ($h);
 				} else
 					$diff = false;
@@ -925,7 +932,6 @@ HERE;
 				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
 				echo $str;
 				$parsed ['prefix'] = $prefix;
-//var_dump (get_exit_code ($h));
 			} elseif (( $parsed ['strmodified'] == 'M') || ($parsed ['strstaged'] == 'M' && $parsed ['strmodified'] == ' ')) {
 				if ($makediff) {
 					$args = Array ('diff', $parsed ['file']);
@@ -936,12 +942,8 @@ HERE;
 					$h = start_command ('git', $args);
 					close_stdin ($h);
 					$str = get_all_data ($h);
-//					debug ($str);
 					$diff = htmlentities ($str);
 					$exit = get_exit_code ($h);
-//					var_dump ($exit);
-//					debug ($diff);
-//var_dump (get_exit_code ($h));
 					clean_up ($h);
 				} else
 					$diff = false;
@@ -954,16 +956,12 @@ HERE;
 				$parsed ['prefix'] = $prefix;
 			} elseif ($parsed ['strmodified'] == 'D') {
 				if ($makediff) {
-//					debug ($parsed);
 					$args = Array ('diff', '--', $parsed ['file']);
 					$h = start_command ('git', $args);
 					close_stdin ($h);
 					$str = get_all_data ($h);
-//					debug ($str);
 					$diff = htmlentities ($str);
 					$exit = get_exit_code ($h);
-//					var_dump ($exit);
-//					debug ($diff);
 					clean_up ($h);
 				} else
 					$diff = false;
@@ -976,16 +974,12 @@ HERE;
 				$parsed ['prefix'] = $prefix;
 			} elseif ($parsed ['strstaged'] == 'D') {
 				if ($makediff) {
-//					debug ($parsed);
 					$args = Array ('diff', '--cached', '--', $parsed ['file']);
 					$h = start_command ('git', $args);
 					close_stdin ($h);
 					$str = get_all_data ($h);
-//					debug ($str);
 					$diff = htmlentities ($str);
 					$exit = get_exit_code ($h);
-//					var_dump ($exit);
-//					debug ($diff);
 					clean_up ($h);
 				} else
 					$diff = false;
@@ -1002,11 +996,8 @@ HERE;
 					$h = start_command ('git', $args);
 					close_stdin ($h);
 					$str = get_all_data ($h);
-//					debug ($str);
 					$diff = htmlentities ($str);
 					$exit = get_exit_code ($h);
-//					var_dump ($exit);
-//					debug ($diff);
 					clean_up ($h);
 				} else
 					$diff = false;
@@ -1021,10 +1012,9 @@ HERE;
 				interpret_not_supported ($parsed);
 		} else {
 			if (isset ($parsed ['dir']) && $parsed ['strmodified'] == '?' && $parsed ['strstaged'] == '?') {
-//				echo "is dir";
-			} else {
+				// is a dir, handled outside this function
+			} else
 				interpret_not_supported ($parsed);
-			}
 		}
 
 		return $parsed;
@@ -1040,7 +1030,6 @@ HERE;
 				$type = filetype ($dir . $entry);
 				if ($type == 'file') {
 					$file = $dir . $entry;
-//					echo '<p>'. $dir . $entry . "</p>\n";
 					$hash = get_file_hash ($file);
 					$parsed = Array ('file' => $file, 'hash' => $hash);
 					$parsed ['state'] = 'New';
@@ -1051,7 +1040,6 @@ HERE;
 						$h = start_command ($command, $args);
 						close_stdin ($h);
 						$diff = htmlentities (get_all_data ($h));
-//						debug ($diff);
 						clean_up ($h);
 					} else
 						$diff = false;
@@ -1106,18 +1094,35 @@ HERE;
 		return $rv;
 	}
 
+	function handle_basic_auth ($realm = 'private area') {
+		global $auth;
+
+		if (isset ($_SERVER['PHP_AUTH_USER'])
+			&& isset ($_SERVER['PHP_AUTH_PW'])
+			&& isset ($auth [$_SERVER['PHP_AUTH_USER']])
+			&& $auth [$_SERVER['PHP_AUTH_USER']]['pass'] === sha1 ($_SERVER['PHP_AUTH_PW'])
+		) {
+			return $auth [$_SERVER['PHP_AUTH_USER']]['name'] . ' <'.$auth [$_SERVER['PHP_AUTH_USER']]['email'].'>';
+		}
+
+		header('WWW-Authenticate: Basic realm="'.$realm.'"');
+		header('HTTP/1.0 401 Unauthorized');
+
+		exit ('You did not supply any or the wrong username/password combination');
+	}
+
+	function handle_htpasswd_auth () {
+		global $auth;
+
+		if (isset ($_SERVER['REMOTE_USER']) && isset ($auth [$_SERVER ['REMOTE_USER']]))
+			return $auth [$_SERVER ['REMOTE_USER']]['name'] . ' <'.$auth [$_SERVER ['REMOTE_USER']]['email'].'>';
+
+		exit ('htpasswd user unknown to git-webcommit');
+	}
+
 /*
 
 notes:
-_______________
-
-status-hash is made like so:
-
-	hash1 = hash (status output)
-	hash2 = hash (file1)
-	hash3 = hash (file2)
-
-	hash (hash1,hash2,hash3) = result ?
 _______________
 
 per file stats:
@@ -1135,54 +1140,5 @@ $ git diff --numstat test.txt
 
 $ wc -l asdfasdf.txt 
 1 asdfasdf.txt
-_______________
-
-basic workflow:
-
-# get list of files changed (porcelain output is machine parsable with status information per file):
-git status --porcelain
-
-# get diff of file
-git diff $FILE
-
-# add file to index/cache to commit
-git add $FILE
-
-# do dry-run before commit
-git commit --dry-run --porcelain
-
-# commit file(s) 
-git commit --file=/tmp/commit.message
-# or commit message from stdin:
-git commit --file=-
-_______________
-
-Short term TODO-list:
-
-- need a function to dynamically update the html_header_message output (starting with the refresh request, it should let the user know it is done refreshing)
-- get_status () and friends should be able to disable the HTML-elements by default
-- need a function to dynamically enable previously disabled HTML-elements
-- need a function to dynamically add HTML-elements
-- need a function to dynamically remove HTML-elements
-- need a function to dynamically add the diff-output
-
-UI technical implementation ideas:
-- send timestamp-based prefixes in the POST to the server
-- the server can than just send whole containers to the client
-- and use appendChild/insertBefore/removeChild to insert it in the DOM in the right place, removing the old container, if any.
-
-__________
-
-Long term TODO-list:
-
-
-__________
-
-add directory:
-
-$ git add fsadadfs/
-$ echo $?
-0
-
 
 */

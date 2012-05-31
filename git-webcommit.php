@@ -27,6 +27,8 @@
 //	$author = $auth ['testuser2']['name'] . '<' . $auth ['testuser2']['email'] . '>'; // 'firstname lastname <email-address>'
 	$author = '';
 
+	$title = '';
+
 	$enable_stats = false; // not available yet
 
 	$debug = false;
@@ -925,8 +927,14 @@ HERE;
 	}
 
 	function html_form_start () {
+		global $title;
+
+		if (isset ($title) && $title != '')
+			$title = $title . ' ';
+
 return <<<HERE
 		<form method="POST">
+		<h1>${title}version control system</h1>
 		<div class="filename_div filelist_header"><span class="checkbox_span">&nbsp;</span><span class="staged_span">Staged</span><span class="state_span">State</span><span class="filename_span">Filename</span></div>
 		<article>
 HERE;
@@ -961,7 +969,9 @@ return <<<HERE
 HERE;
 	}
 
-	function html_header ($title = '') {	
+	function html_header () {
+		global $title;
+
 		if ($title != '')
 			$title = ': '.$title;
 
@@ -988,22 +998,24 @@ HERE;
 
 	$padding = '10px';
 	$margin = '6px';
-	$totalwidth = '800px';
+	$totalwidth = '1000px';
 
 return <<<HERE
 	PRE { color: purple; } /* debug */
-	BODY { background-color: #fff; }
-	TEXTAREA { display: none; width: $totalwidth; height: 300px; border: 1px solid black; }
+	BODY { background-color: #fff; font-family: arial; font-size: 13px; text-align: center; margin: 0; pading: 0; }
+	FORM { width: $totalwidth; margin: 0 auto; text-align: left; }
+	TEXTAREA { display: none; width: 100%; height: 300px; border: 1px solid black; font-size: 11px; }
 	ARTICLE DIV:nth-child(even) { background-color: #efefef }
-	.filename_div { border: 1px solid black; width: $totalwidth; padding-top: 3px; padding-bottom: 3px; margin-top: $margin; margin-bottom: $margin; overflow: hidden; background-color: inherit}
+	.filename_div { cursor: pointer; border: 1px solid black; width: $totalwidth; padding-top: 3px; padding-bottom: 3px; margin-top: $margin; margin-bottom: $margin; overflow: hidden; background-color: inherit}
 	.state_span, .staged_span, .checkbox_span { float: left; padding-left: $padding; padding-right: $padding; }
 	.staged_span { width: 60px; }
 	.state_span { width: 100px; }
 	.checkbox_span { width: 14px; }
-	.filelist_header { font-weight: bold; }
+	.filelist_header { font-weight: bold; cursor: default; }
 	.checkbox { border: 1px solid black; }
 	#commit_message { margin-top: $margin; }
 	.error { font-weight: bold; color: red; }
+	H1 { font-size: 16px; margin: 0; padding: 0; }
 HERE;
 	}
 

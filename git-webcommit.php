@@ -929,12 +929,14 @@ HERE;
 	function html_form_start () {
 		global $title;
 
+		$strtitle = '';
+
 		if (isset ($title) && $title != '')
-			$title = $title . ' ';
+			$strtitle = $title . ' ';
 
 return <<<HERE
 		<form method="POST">
-		<h1>${title}version control system</h1>
+		<h1>${strtitle}version control system</h1>
 		<div class="filename_div filelist_header"><span class="checkbox_span">&nbsp;</span><span class="staged_span">Staged</span><span class="state_span">State</span><span class="filename_span">Filename</span></div>
 		<article>
 HERE;
@@ -972,8 +974,10 @@ HERE;
 	function html_header () {
 		global $title;
 
+		$strtitle = '';
+
 		if ($title != '')
-			$title = ': '.$title;
+			$strtitle = ': '.$title;
 
 		$css = html_css ();
 
@@ -983,7 +987,7 @@ return <<<HERE
 <!DOCTYPE HTML>
 
 <html>
-	<head><title>git webcommit$title</title><style>$css</style><script>$js</script></head>
+	<head><title>git webcommit$strtitle</title><style>$css</style><script>$js</script></head>
 	<body>
 HERE;
 	}

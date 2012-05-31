@@ -46,7 +46,8 @@
 
 	$dir = $repos [$defaultrepo];
 
-	chdir ($dir);
+	if (!chdir ($dir))
+		exit ('directory not found: '.$dir);
 
 	$_handles = Array ();
 	$_handlecount = 0;
@@ -310,7 +311,7 @@
 
 ///////////////////////////////
 
-	function make_one_hash ($rs) {
+	function make_one_hash (&$rs) {
 		$str = '';
 	
 		if (isset ($rs ['lines']) && is_array ($rs ['lines']))
@@ -353,11 +354,13 @@
 			while (!is_done ($h)) {
 				$line = get_stdout_line ($h);
 				if ($line != '') {
+					debug ($line);
 					$parsed = parse_line ($line);
 					$int = interpret ($parsed, $disabled, $makediff, $stats);
 					if ($int !== false) {
 						if (isset ($int ['dir'])) {
-							$list = add_directory_listing ($parsed ['dir'], $disabled, $makediff, $stats);
+							$list = Array ();
+							$list = add_directory_listing ($parsed ['dir'], $disabled, $makediff, $stats, $list);
 							$result ['lines'] = array_merge ($result ['lines'], $list);
 						} else
 							$result ['lines'][] = $int;
@@ -377,7 +380,7 @@
 
 			$result ['disable_commit'] = false;
 
-			make_one_hash (&$result);
+			make_one_hash ($result);
 		}
 
 		clean_up ($h);
@@ -524,21 +527,18 @@
 				echo $str;
 				$parsed ['prefix'] = $prefix;
 			} else
-				interpret_not_supported ($parsed);
+				interpret_not_supported ($parsed, __FILE__, __LINE__);
 		} else {
 			if (isset ($parsed ['dir']) && $parsed ['strmodified'] == '?' && $parsed ['strstaged'] == '?') {
 				// is a dir, handled outside this function
 			} else
-				interpret_not_supported ($parsed);
+				interpret_not_supported ($parsed, __FILE__, __LINE__);
 		}
 
 		return $parsed;
 	}
 
-	function add_directory_listing ($dir, $disabled, $makediff, $stats, $list = false) {
-		if ($list === false)
-			$list = Array ();
-
+	function add_directory_listing ($dir, $disabled, $makediff, $stats, &$list) {
 		$handle = opendir ($dir);
 		while (($entry = readdir ($handle)) !== false)
 			if ($entry != '.' && $entry != '..') {
@@ -563,16 +563,26 @@
 					$parsed ['prefix'] = $prefix;
 					$list [] = $parsed;
 				} elseif ($type == 'dir') {
-					add_directory_listing ($dir . $entry . '/', $disabled, $makediff, $stats, &$list);
+					add_directory_listing ($dir . $entry . '/', $disabled, $makediff, $stats, $list);
 				} else
-					interpret_not_supported ($dir . $entry);
+					interpret_not_supported ($dir . $entry, __FILE__, __LINE__);
 			}
 
 		return $list;
 	}
 
-	function interpret_not_supported ($debug) {
-		error ('Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
+	function interpret_not_supported ($debug, $file = false, $line = false) {
+		if ($file === false)
+			$file = '';
+		else
+			$file = $file . ': ';
+
+		if ($line === false)
+			$line = '';
+		else
+			$line = $line . ': ';
+
+		error ($file.$line.'Not implemented: Only changed, added, deleted files is supported right now. Found something else in the output of git status, debug output is below. Sorry.');
 
 		debug ($debug, true);
 
@@ -626,7 +636,7 @@
 
 		$command = escapeshellcmd ($command);
 
-		$proc = proc_open($command . ' ' . $args, $descriptorspec, &$pipes);
+		$proc = proc_open($command . ' ' . $args, $descriptorspec, $pipes);
 
 		if (is_resource($proc)) {
 			if ($blocking === false) {

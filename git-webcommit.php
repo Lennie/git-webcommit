@@ -414,9 +414,9 @@
 
 			return $res;
 		} elseif ($str [0] == ' ' && $str [1] == 'D') {
-			$res = Array ('strstaged' => ' ', 'strmodified' => 'D', 'str' => $str, 'file' => $file, 'hash' => $sha1_empty_string);
+			$res = Array ('strstaged' => ' ', 'strmodified' => 'D', 'str' => $str, 'file' => $file, 'hash' => sha1 ($file . $sha1_empty_string));
 		} elseif ($str [0] == 'D' && $str [1] == ' ') {
-			$res = Array ('strstaged' => 'D', 'strmodified' => ' ', 'str' => $str, 'file' => $file, 'hash' => $sha1_empty_string);
+			$res = Array ('strstaged' => 'D', 'strmodified' => ' ', 'str' => $str, 'file' => $file, 'hash' => sha1 ($file . $sha1_empty_string));
 		} elseif ($str [0] == 'R') {
 			$sub = substr ($str, 4);
 			$arr = explode (' -> ', $sub);

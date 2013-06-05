@@ -421,6 +421,9 @@
 			$sub = substr ($str, 4);
 			$arr = explode (' -> ', $sub);
 			$res =  Array ('strstaged' => 'R', 'strmodified' => ' ', 'str' => $str, 'oldfile' => $arr [0], 'newfile' => $arr [1], 'hash' => get_file_hash ($arr[1]), 'file' => $arr[1]);
+		} elseif ($str [0] == 'C') {
+			preg_match ('/(.*) -> (.*)/', $file, $filenames);
+			$res = Array ('strstaged' => $str [0], 'strmodified' => ' ', 'oldfile' => $filenames [1], 'newfile' => $filenames [2], 'str' => $str, 'hash' => get_file_hash ($filenames [2]), 'file' => $filenames [2]);
 		} else
 			$res = Array ('str' => $str);
 
@@ -526,6 +529,15 @@
 				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $diff, $disabled);
 				echo $str;
 				$parsed ['prefix'] = $prefix;
+			} elseif ($parsed ['strstaged'] == 'C') {
+				$info = htmlentities ('file ' . $parsed ['newfile'] . ' is a copy of ' . $parsed ['oldfile']);
+
+				$parsed ['state'] = set_state ($parsed ['strmodified'], $parsed ['strstaged']);
+				$parsed ['staged'] = set_staged ($parsed ['strmodified'], $parsed ['strstaged']);
+
+				list ($str, $prefix) = html_file ($parsed ['file'], $parsed ['state'], $parsed ['staged'], $parsed ['hash'], $info, $disabled);
+				echo $str;
+				$parsed ['prefix'] = $prefix;
 			} else
 				interpret_not_supported ($parsed, __FILE__, __LINE__);
 		} else {
@@ -604,6 +616,9 @@
 		if ($staged == 'R')
 			$rv = 'Renamed';
 
+		if ($staged == 'C')
+			$rv = 'Copied';
+
 		return $rv;
 	}
 
@@ -613,7 +628,7 @@
 		if ($staged == ' ' || $staged == '?')
 			$rv = 'N';
 
-		if ($staged == 'Y' || $staged == 'M' || $staged == 'A' || $staged == 'D' || $staged == 'R')
+		if ($staged == 'Y' || $staged == 'M' || $staged == 'A' || $staged == 'D' || $staged == 'R' || $staged == 'C')
 			$rv = 'Y';
 
 		return $rv;

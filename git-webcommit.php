@@ -34,6 +34,9 @@
 	$debug = false;
 //	$debug = true;
 
+	$gitpath = 'git';
+	$diffpath = 'diff';
+
 	/// main ///
 
 	if ($authmethod === 'httpbasic')
@@ -194,6 +197,8 @@
 ///////////////////////////////
 
 	function stage_file ($file, $status) {
+		global $gitpath;
+
 		echo html_header_message_update ("staging file $file");
 
 		if ($status ['state'] == 'Deleted')
@@ -202,7 +207,7 @@
 			$args = Array ('add', $file);
 
 		debug ('git ' . implode (' ', $args));
-		$h = start_command ('git', $args);
+		$h = start_command ($gitpath, $args);
 		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
 		debug ("stdout: $stdout");
 		debug ("stderr: $stderr");
@@ -222,13 +227,15 @@
 	}
 
 	function unstage_file ($file, $status) {
+		global $gitpath;
+
 		echo html_header_message_update ("unstaging file: $file");
 
 		debug ($status);
 
 		$args = Array ('reset', 'HEAD', $file);
 		debug ('git ' . implode (' ', $args));
-		$h = start_command ('git', $args);
+		$h = start_command ($gitpath, $args);
 		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
 		debug ("stdout: $stdout");
 		debug ("stderr: $stderr");
@@ -248,7 +255,7 @@
 	}
 
 	function do_commit ($msg = false, $author = '') {
-		global $commit_message;
+		global $commit_message, $gitpath;
 
 		$tmp = tempnam ('/tmp', 'git-commit');
 		$fp = fopen ($tmp, 'w+');
@@ -262,7 +269,7 @@
 			$args [] = $author;
 		}
 		debug ('git ' . implode (' ', $args));
-		$h = start_command ('git', $args);
+		$h = start_command ($gitpath, $args);
 		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
 		debug ("stdout: $stdout");
 		debug ("stderr: $stderr");
@@ -324,7 +331,7 @@
 	}
 
 	function get_status ($disabled = false, $makediff = true, $stats = false) {
-		global $somethingstaged;
+		global $somethingstaged, $gitpath;
 
 		static $firstrun;
 
@@ -342,7 +349,7 @@
 
 		clearstatcache ();
 
-		$h = start_command ('git', Array ('status', '--porcelain'), false);
+		$h = start_command ($gitpath, Array ('status', '--porcelain'), false);
 		if ($h === false)
 			return error ('command failed to start');
 		else {
@@ -431,6 +438,8 @@
 	}
 
 	function interpret ($parsed, $disabled = false, $makediff = true, $stats = false) {
+		global $gitpath;
+
 		if (isset ($parsed ['file'])) {
 			if ($parsed ['strstaged'] == '?' || $parsed ['strstaged'] == 'A') {
 				if ($makediff) {
@@ -438,7 +447,7 @@
 					$args = Array ('-u', '/dev/null', $parsed ['file']);
 					if (isset ($parsed ['staged']) && $parsed ['staged'] == 'A') {
 						$args = Array ('diff', '--cached', $parsed ['file']);
-						$command = 'git';
+						$command = $gitpath;
 					}
 					$h = start_command ($command, $args);
 					close_stdin ($h);
@@ -460,7 +469,7 @@
 					if ($parsed ['strstaged'] == 'M' && $parsed ['strmodified'] == ' ')
 						$args = Array ('diff', '--cached', $parsed ['file']);
 
-					$h = start_command ('git', $args);
+					$h = start_command ($gitpath, $args);
 					close_stdin ($h);
 					$str = get_all_data ($h);
 					$diff = htmlentities ($str);
@@ -478,7 +487,7 @@
 			} elseif ($parsed ['strmodified'] == 'D') {
 				if ($makediff) {
 					$args = Array ('diff', '--', $parsed ['file']);
-					$h = start_command ('git', $args);
+					$h = start_command ($gitpath, $args);
 					close_stdin ($h);
 					$str = get_all_data ($h);
 					$diff = htmlentities ($str);
@@ -496,7 +505,7 @@
 			} elseif ($parsed ['strstaged'] == 'D') {
 				if ($makediff) {
 					$args = Array ('diff', '--cached', '--', $parsed ['file']);
-					$h = start_command ('git', $args);
+					$h = start_command ($gitpath, $args);
 					close_stdin ($h);
 					$str = get_all_data ($h);
 					$diff = htmlentities ($str);
@@ -514,7 +523,7 @@
 			} elseif ($parsed ['strstaged'] == 'R') {
 				if ($makediff) {
 					$args = Array ('diff', '--cached', '--', $parsed ['file']);
-					$h = start_command ('git', $args);
+					$h = start_command ($gitpath, $args);
 					close_stdin ($h);
 					$str = get_all_data ($h);
 					$diff = htmlentities ($str);
@@ -551,6 +560,8 @@
 	}
 
 	function add_directory_listing ($dir, $disabled, $makediff, $stats, &$list) {
+		global $diffpath;
+
 		$handle = opendir ($dir);
 		while (($entry = readdir ($handle)) !== false)
 			if ($entry != '.' && $entry != '..') {
@@ -562,7 +573,7 @@
 					$parsed ['state'] = 'New';
 					$parsed ['staged'] = 'N';
 					if ($makediff) {
-						$command = 'diff';
+						$command = $diffpath;
 						$args = Array ('-u', '/dev/null', $parsed ['file']);
 						$h = start_command ($command, $args);
 						close_stdin ($h);

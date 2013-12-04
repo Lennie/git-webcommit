@@ -378,8 +378,13 @@
 			}
 
 			$exit = get_exit_code ($h);
-			if ($exit !== 0)
-				return error ('command failed, it returned exitcode: '.$exit);
+
+			if ($exit !== 0) {
+ 				$errors = get_all_data ($h, Array ('stdout', 'stderr'));
+ 				if (!is_array ($errors))
+ 					$errors = Array ();
+ 				return error ("command failed with exitcode ".$exit.":\n".implode (' ', $errors));
+			}
 
 			$result ['output'] = get_all_data ($h);
 

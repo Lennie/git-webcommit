@@ -4,15 +4,15 @@
 	/// settings ///
 
 	// configure the list of repositories, only one support at the moment
-	$repos = Array ('/some/dir');
+	$repos = Array ('/tmp/git-webcommit');
 
 	// set the default repository, you probably want to keep it set to 0
 	$defaultrepo = 0;
 
 	// configure the authentication method:
-//	$authmethod = 'httpbasic';
+	$authmethod = 'httpbasic';
 //	$authmethod = 'htpasswd';
-	$authmethod = 'none';
+//	$authmethod = 'none';
 
 	// when using htpasswd, the 'pass' entry isn't needed
 	// 'name' and 'email' are required.
@@ -24,8 +24,8 @@
 //	exit (sha1 ('my pass'));
 
 	// author for when you don't use authentication
-//	$author = $auth ['testuser2']['name'] . '<' . $auth ['testuser2']['email'] . '>'; // 'firstname lastname <email-address>'
-	$author = '';
+	$author = $auth ['testuser2']['name'] . '<' . $auth ['testuser2']['email'] . '>'; // 'firstname lastname <email-address>'
+//	$author = '';
 
 	$title = '';
 
@@ -76,6 +76,10 @@
 			handle_commit_req ();
 		elseif (isset ($_POST ['refresh']) && $_POST ['refresh'])
 			handle_refresh_req ();
+		elseif (isset ($_POST ['pull']) && $_POST ['pull'])
+			handle_pull_req ();
+		elseif (isset ($_POST ['push']) && $_POST ['push'])
+			handle_push_req ();
 		else {
 			error ('POST failure');
 			exit ();
@@ -110,6 +114,22 @@
 
 		view_result ();
 		echo html_header_message_update ('refreshing... done');
+	}
+
+	function handle_pull_req () {
+		echo html_header_message ('pulling...');
+		echo html_form_start ();
+		do_git_action('pull');
+		view_result ();
+		echo html_header_message_update ('pulling... done');
+	}
+
+	function handle_push_req () {
+		echo html_header_message ('pushing...');
+		echo html_form_start ();
+		do_git_action('push');
+		view_result ();
+		echo html_header_message_update ('pushing... done');
 	}
 
 	function handle_change_staged_req () {
@@ -266,7 +286,7 @@
 		$args = Array ('commit', '--no-status', '-F', $tmp);
 		if ($author != '') {
 			$args [] = '--author';
-			$args [] = $author;
+			$args [] = '"'.$author.'"';
 		}
 		debug ('git ' . implode (' ', $args));
 		$h = start_command ($gitpath, $args);
@@ -283,6 +303,32 @@
 			$commit_message = '';
 		} else {
 			echo html_header_message_update ('commiting changed files...: <span class="error">FAILED</a>', true);
+			if (trim ($stderr) != '')
+				error ("$stderr");
+			echo html_form_end ();
+			exit ();
+		}
+	}
+
+	function do_git_action ($action) {
+		global $commit_message, $gitpath;
+
+
+		echo html_header_message_update ($action."ing...");
+		$args = Array ($action);
+		
+		debug ('git ' . implode (' ', $args));
+		$h = start_command ($gitpath, $args);
+		list ($stdout, $stderr) = get_all_data ($h, Array ('stdout', 'stderr'));
+		debug ("stdout: $stdout");
+		debug ("stderr: $stderr");
+		$exit = get_exit_code ($h);
+		debug ($exit);
+		clean_up ($h);
+		if ($exit === 0) {
+			echo html_header_message_update ($action."ing... OK");
+		} else {
+			echo html_header_message_update ($action.'ing...: <span class="error">FAILED</a>', true);
 			if (trim ($stderr) != '')
 				error ("$stderr");
 			echo html_form_end ();
@@ -1001,6 +1047,8 @@ HERE;
 
 return <<<HERE
 		</article>
+		<input id="pull" type="submit" name="pull" value="pull">
+		<input id="push" type="submit" name="push" value="push">
 		<input id="change_staged" type="submit" name="change_staged" value="change staged">
 		<input id="submit_commit" type="submit" name="commit" value="commit">
 		<input id="submit_refresh" type="submit" name="refresh" value="refresh">

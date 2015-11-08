@@ -354,7 +354,7 @@
 ///////////////////////////////
 
 	function error ($str = '') {
-		echo '<p>ERROR: '.$str . "</p>\n";
+		echo '<pre>ERROR: '.$str . "</pre>\n";
 		return false;
 	}
 

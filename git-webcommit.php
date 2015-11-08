@@ -618,8 +618,10 @@
 		} else {
 			if (isset ($parsed ['dir']) && $parsed ['strmodified'] == '?' && $parsed ['strstaged'] == '?') {
 				// is a dir, handled outside this function
-			} else
+			} else {
+				// if type == 'link' -> readlink ( see Github issue #3 )
 				interpret_not_supported ($parsed, __FILE__, __LINE__);
+			}
 		}
 
 		return $parsed;

@@ -1118,13 +1118,18 @@ HERE;
 
 	$padding = '10px';
 	$margin = '6px';
-	$totalwidth = '1000px';
+	$totalwidth = 1000;
+	$commitbox = $totalwidth-10;
+	$commitbox .= 'px';
+	$fixeddiv = $totalwidth-6;
+	$fixeddiv .= 'px';
+	$totalwidth .= 'px';
 
 return <<<HERE
 	PRE { color: purple; } /* debug */
 	BODY { background-color: #fff; font-family: arial; font-size: 13px; text-align: center; margin: 0; pading: 0; }
 	FORM { width: $totalwidth; margin: 0 auto; text-align: left; margin-bottom:200px;}
-	TEXTAREA { display: none; width: 100%; height:180px; width: 1000px; border: 1px solid black; font-size: 11px; }
+	TEXTAREA { display: none; width: 100%; height:180px; width: $commitbox; border: 1px solid black; font-size: 11px; }
 	ARTICLE DIV:nth-child(even) { background-color: #efefef }
 	.filename_div { cursor: pointer; border: 1px solid black; width: $totalwidth; padding-top: 3px; padding-bottom: 3px; margin-top: $margin; margin-bottom: $margin; overflow: hidden; background-color: inherit}
 	.state_span, .staged_span, .checkbox_span { float: left; padding-left: $padding; padding-right: $padding; }
@@ -1142,10 +1147,13 @@ return <<<HERE
 		position:fixed;
                 bottom:0;
 		border-top:2px silver solid;
+		border-right:2px silver solid;
+		border-left:2px silver solid;
 		background:#e3e3e3;
 		padding-top:5px;
+		padding-left:5px;
 		height:120px;
-		width:1000px;
+		width: $fixeddiv;
 	}
 	.fixed input {
 		border:1px gray solid;

@@ -1119,11 +1119,15 @@ HERE;
 	$padding = '10px';
 	$margin = '6px';
 	$totalwidth = 1000;
+
 	$commitbox = $totalwidth-10;
-	$commitbox .= 'px';
 	$fixeddiv = $totalwidth-6;
-	$fixeddiv .= 'px';
+	$textarea = $totalwidth-18;
+
 	$totalwidth .= 'px';
+	$commitbox .= 'px';
+	$fixeddiv .= 'px';
+	$textarea .= 'px';
 
 return <<<HERE
 	PRE { color: purple; } /* debug */
@@ -1161,6 +1165,7 @@ return <<<HERE
 	}
 	.fixed TEXTAREA {
 		height:80px;
+		width: $textarea;
 	}
 HERE;
 	}

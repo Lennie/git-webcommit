@@ -37,6 +37,9 @@
 	$gitpath = 'git';
 	$diffpath = 'diff';
 
+	if (file_exists (dirname (__FILE__) . '/config-git-webcommit.php'))
+		include (dirname (__FILE__) . '/config-git-webcommit.php');
+
 	/// main ///
 
 	if ($authmethod === 'httpbasic')

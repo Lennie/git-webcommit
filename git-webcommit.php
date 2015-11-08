@@ -31,6 +31,8 @@
 
 	$enable_stats = false; // not available yet
 
+	$disable_push_pull = false;
+
 	$debug = false;
 //	$debug = true;
 
@@ -120,6 +122,11 @@
 	}
 
 	function handle_pull_req () {
+		global $disable_push_pull;
+
+		if (isset ($disable_push_pull) && $disable_push_pull === true)
+			return false;
+
 		echo html_header_message ('pulling...');
 		echo html_form_start ();
 		do_git_action('pull');
@@ -128,6 +135,11 @@
 	}
 
 	function handle_push_req () {
+		global $disable_push_pull;
+
+		if (isset ($disable_push_pull) && $disable_push_pull === true)
+			return false;
+
 		echo html_header_message ('pushing...');
 		echo html_form_start ();
 		do_git_action('push');
@@ -1039,7 +1051,7 @@ HERE;
 	}
 
 	function html_form_end ($something_to_commit = false, $hash = '') {
-		global $commit_message;
+		global $commit_message, $disable_push_pull;
 
 		$something_to_commit = $something_to_commit ? 'true' : 'false'; 
 
@@ -1048,10 +1060,18 @@ HERE;
 		else
 			$commit_message = htmlentities ($commit_message);
 
-return <<<HERE
-		</article>
+		if (isset ($disable_push_pull) && $disable_push_pull === true) {
+			$pushpullbuttons = '';
+		} else {
+$pushpullbuttons = <<<HERE
+
 		<input id="pull" type="submit" name="pull" value="pull">
 		<input id="push" type="submit" name="push" value="push">
+HERE;
+		}
+
+return <<<HERE
+		</article>${pushpullbuttons}
 		<input id="change_staged" type="submit" name="change_staged" value="change staged">
 		<input id="submit_commit" type="submit" name="commit" value="commit">
 		<input id="submit_refresh" type="submit" name="refresh" value="refresh">

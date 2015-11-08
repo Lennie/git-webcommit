@@ -1071,12 +1071,14 @@ HERE;
 		}
 
 return <<<HERE
-		</article>${pushpullbuttons}
-		<input id="change_staged" type="submit" name="change_staged" value="change staged">
-		<input id="submit_commit" type="submit" name="commit" value="commit">
-		<input id="submit_refresh" type="submit" name="refresh" value="refresh">
-		<input type="hidden" name="statushash" value="$hash">
-		<textarea id="commit_message" name="commit_message">$commit_message</textarea>
+		</article>
+		<div class="fixed">${pushpullbuttons}
+			<input id="change_staged" type="submit" name="change_staged" value="change staged">
+			<input id="submit_commit" type="submit" name="commit" value="commit">
+			<input id="submit_refresh" type="submit" name="refresh" value="refresh">
+			<input type="hidden" name="statushash" value="$hash">
+			<textarea id="commit_message" name="commit_message">$commit_message</textarea>
+		</div>
 		</form>
 		<script>something_to_commit = $something_to_commit; enable_disable_buttons (); handle_commit_textarea ();</script>
 		
@@ -1119,8 +1121,8 @@ HERE;
 return <<<HERE
 	PRE { color: purple; } /* debug */
 	BODY { background-color: #fff; font-family: arial; font-size: 13px; text-align: center; margin: 0; pading: 0; }
-	FORM { width: $totalwidth; margin: 0 auto; text-align: left; }
-	TEXTAREA { display: none; width: 100%; height: 300px; border: 1px solid black; font-size: 11px; }
+	FORM { width: $totalwidth; margin: 0 auto; text-align: left; margin-bottom:200px;}
+	TEXTAREA { display: none; width: 100%; height:180px; width: 1000px; border: 1px solid black; font-size: 11px; }
 	ARTICLE DIV:nth-child(even) { background-color: #efefef }
 	.filename_div { cursor: pointer; border: 1px solid black; width: $totalwidth; padding-top: 3px; padding-bottom: 3px; margin-top: $margin; margin-bottom: $margin; overflow: hidden; background-color: inherit}
 	.state_span, .staged_span, .checkbox_span { float: left; padding-left: $padding; padding-right: $padding; }
@@ -1132,6 +1134,24 @@ return <<<HERE
 	#commit_message { margin-top: $margin; }
 	.error { font-weight: bold; color: red; }
 	H1 { font-size: 16px; margin: 0; padding: 0; }
+	.up_arrow { width:0px; height:0px; border-left:10px solid transparent; border-right:10px solid transparent; border-bottom:10px solid #000; }
+	.left_arrow { width:0px; height:0px; border-top:10px solid transparent; border-bottom:10px solid transparent; border-right:10px solid #000; }
+	.fixed {
+		position:fixed;
+                bottom:0;
+		border-top:2px silver solid;
+		background:#e3e3e3;
+		padding-top:5px;
+		height:120px;
+		width:1000px;
+	}
+	.fixed input {
+		border:1px gray solid;
+		border-radius:5px;
+	}
+	.fixed TEXTAREA {
+		height:80px;
+	}
 HERE;
 	}
 
@@ -1284,6 +1304,9 @@ HERE;
 			$disabled = 'disabled ';
 		else
 			$disabled = '';
+
+/// <div class="up_arrow"></div>
+/// <div class="left_arrow"></div>
 
 $str = <<<HERE
 <div title="$filename" id="${prefix}_div" class="filename_div"><span class="checkbox_span" id="${prefix}_checkbox_span"><input class="checkbox" ${checked}type="checkbox" id="${prefix}_checkbox" ${disabled} name="stagecheckbox[]" value="$hash"></span><span class="staged_span">$staged</span><span class="state_span">$state</span><span class="filename_span">$filename</span>
